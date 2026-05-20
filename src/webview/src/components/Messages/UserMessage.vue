@@ -121,6 +121,8 @@ const modeBorderColor = computed(() => {
         return 'color-mix(in srgb, #a855f7 45%, transparent)';
       case 'plan':
         return 'color-mix(in srgb, #3b82f6 45%, transparent)';
+      case 'auto':
+        return 'color-mix(in srgb, #22c55e 45%, transparent)';
       default:
         return 'color-mix(in srgb, var(--vscode-foreground) 25%, transparent)';
     }

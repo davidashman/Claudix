@@ -33,7 +33,7 @@
         :item="{
           id: 'acceptEdits',
           label: 'Accept Edits',
-          icon: 'codicon-infinity text-[14px]!',
+          icon: 'codicon-edit text-[14px]!',
           checked: effectiveMode === 'acceptEdits',
           type: 'agent-mode'
         }"
@@ -51,6 +51,18 @@
         }"
         :is-selected="effectiveMode === 'plan'"
         :index="2"
+        @click="(item) => handleModeSelect(item, close)"
+      />
+      <DropdownItem
+        :item="{
+          id: 'auto',
+          label: 'Auto',
+          icon: 'codicon-infinity text-[14px]!',
+          checked: effectiveMode === 'auto',
+          type: 'auto-mode'
+        }"
+        :is-selected="effectiveMode === 'auto'"
+        :index="3"
         @click="(item) => handleModeSelect(item, close)"
       />
     </template>
@@ -96,6 +108,8 @@ const selectedModeLabel = computed(() => {
       return 'Accept Edits'
     case 'plan':
       return 'Plan Mode'
+    case 'auto':
+      return 'Auto'
     default:
       return 'Ask Permissions'
   }
@@ -104,9 +118,11 @@ const selectedModeLabel = computed(() => {
 const selectedModeIcon = computed(() => {
   switch (effectiveMode.value) {
     case 'acceptEdits':
-      return 'codicon-infinity'
+      return 'codicon-edit'
     case 'plan':
       return 'codicon-todos'
+    case 'auto':
+      return 'codicon-infinity'
     default:
       return 'codicon-question'
   }
@@ -150,6 +166,10 @@ function handleModeSelect(item: DropdownItemData, close: () => void) {
 
 .mode-dropdown--plan {
   color: #3b82f6;
+}
+
+.mode-dropdown--auto {
+  color: #22c55e;
 }
 
 .mode-dropdown:hover,

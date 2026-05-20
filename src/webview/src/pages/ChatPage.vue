@@ -16,78 +16,80 @@
           :style="containerHeight > 0 ? { '--thread-height': containerHeight + 'px' } : {}"
         >
           <div class="messages-inner">
-          <template v-if="sessionLoading || isSessionLoading || messages.length === 0">
-            <div class="emptyState" @animationiteration="handleIconAnimationIteration">
-              <template v-if="sessionError">
-                <div v-if="sessionError" class="errorBox">
-                  <span class="codicon codicon-error errorBoxIcon"></span>
-                  <div class="errorBoxText">{{ sessionError }}</div>
-                </div>
-                <button class="retryBtn" @click="handleRetry">Retry</button>
-              </template>
-              <RelayIcon v-else :class="['relay-icon-loading', showLoadingAnimation ? 'relay-icon-working' : 'relay-icon-waiting']" />
-            </div>
-          </template>
-          <template v-else>
-            <div v-if="firstSectionScrolledOff" class="history-above-line" />
-            <template v-for="section in chatSections" :key="section.key">
-              <!-- Pre-section: messages before the first user prompt -->
-              <template v-if="section.header === null">
-                <template v-for="seg in section.body" :key="seg.key">
-                  <div v-if="seg.type === 'tool-group'" class="tool-group-msg">
-                    <ToolGroup :wrappers="getGroupWrappers(seg.messages)" :context="toolContext" />
+            <template v-if="sessionLoading || isSessionLoading || messages.length === 0">
+              <div class="emptyState" @animationiteration="handleIconAnimationIteration">
+                <template v-if="sessionError">
+                  <div v-if="sessionError" class="errorBox">
+                    <span class="codicon codicon-error errorBoxIcon"></span>
+                    <div class="errorBoxText">{{ sessionError }}</div>
                   </div>
-                  <MessageRenderer v-else :message="seg.message" :context="toolContext" />
+                  <button class="retryBtn" @click="handleRetry">Retry</button>
                 </template>
-              </template>
-              <!-- Section: sticky user prompt header + its responses -->
-              <div
-                v-else
-                class="chat-section"
-                :data-section-key="section.key"
-                :style="section.key === lastSectionKey && containerHeight > 0 ? { minHeight: containerHeight + 'px' } : {}"
-              >
-                <div class="section-sticky-header" @click="scrollToSection(section.key)">
-                  <UserMessage
-                    :message="section.header.message"
-                    :context="toolContext"
-                    :pinned="true"
-                    :is-active="isBusy && section.key === lastSectionKey"
-                    :is-compacting="isCompacting"
-                    :permission-mode="permissionMode"
-                    @interrupt="handleTurnInterrupt"
-                  />
-                </div>
-                <div class="section-body">
-                  <div v-for="seg in section.body" :key="seg.key" class="section-content">
-                    <div v-if="seg.type === 'tool-group'" class="tool-group-msg">
-                      <ToolGroup :wrappers="getGroupWrappers(seg.messages)" :context="toolContext" />
-                    </div>
-                    <MessageRenderer v-else :message="seg.message" :context="toolContext" />
-                  </div>
-                  <template v-if="section.key === lastSectionKey">
-                    <StreamingMessage v-if="streamingText" :text="streamingText" />
-                    <div class="busy-indicator">
-                      <RelayIcon :class="['relay-icon', relayIconClass]" />
-                    </div>
-                    <div class="end-spacer" />
-                  </template>
-                </div>
+                <RelayIcon v-else :class="['relay-icon-loading', showLoadingAnimation ? 'relay-icon-working' : 'relay-icon-waiting']" />
               </div>
             </template>
-            <div ref="endEl" />
-          </template>
+            <template v-else>
+              <div v-if="firstSectionScrolledOff" class="history-above-line" />
+              <div class="messages-thread">
+                <template v-for="section in chatSections" :key="section.key">
+                  <!-- Pre-section: messages before the first user prompt -->
+                  <template v-if="section.header === null">
+                    <template v-for="seg in section.body" :key="seg.key">
+                      <div v-if="seg.type === 'tool-group'" class="tool-group-msg">
+                        <ToolGroup :wrappers="getGroupWrappers(seg.messages)" :context="toolContext" />
+                      </div>
+                      <MessageRenderer v-else :message="seg.message" :context="toolContext" />
+                    </template>
+                  </template>
+                  <!-- Section: sticky user prompt header + its responses -->
+                  <div
+                    v-else
+                    class="chat-section"
+                    :data-section-key="section.key"
+                    :style="section.key === lastSectionKey && containerHeight > 0 ? { minHeight: containerHeight + 'px' } : {}"
+                  >
+                    <div class="section-sticky-header" @click="scrollToSection(section.key)">
+                      <UserMessage
+                        :message="section.header.message"
+                        :context="toolContext"
+                        :pinned="true"
+                        :is-active="isBusy && section.key === lastSectionKey"
+                        :is-compacting="isCompacting"
+                        :permission-mode="permissionMode"
+                        @interrupt="handleTurnInterrupt"
+                      />
+                    </div>
+                    <div class="section-body">
+                      <div v-for="seg in section.body" :key="seg.key" class="section-content">
+                        <div v-if="seg.type === 'tool-group'" class="tool-group-msg">
+                          <ToolGroup :wrappers="getGroupWrappers(seg.messages)" :context="toolContext" />
+                        </div>
+                        <MessageRenderer v-else :message="seg.message" :context="toolContext" />
+                      </div>
+                      <template v-if="section.key === lastSectionKey">
+                        <StreamingMessage v-if="streamingText" :text="streamingText" />
+                        <div class="busy-indicator">
+                          <RelayIcon :class="['relay-icon', relayIconClass]" />
+                        </div>
+                        <div class="end-spacer" />
+                      </template>
+                    </div>
+                  </div>
+                </template>
+              </div>
+              <div ref="endEl" />
+            </template>
 
-          <!-- Jump to latest button (floating over messages) -->
-          <Transition name="jump-button">
-            <div v-if="showJumpToLatest" class="jumpToLatestContainer">
-              <button class="jumpToLatestButton" @click="jumpToLatest">
-                <span class="codicon codicon-arrow-down"></span>
-              </button>
-            </div>
-          </Transition>
+            <!-- Jump to latest button (floating over messages) -->
+            <Transition name="jump-button">
+              <div v-if="showJumpToLatest" class="jumpToLatestContainer">
+                <button class="jumpToLatestButton" @click="jumpToLatest">
+                  <span class="codicon codicon-arrow-down"></span>
+                </button>
+              </div>
+            </Transition>
 
-          <div class="bottom-fade" />
+            <div class="bottom-fade" />
           </div>
         </div>
 
@@ -759,7 +761,7 @@
     if (isTerminalMode) {
       const rawSession = activeSessionRaw.value;
       if (rawSession) {
-        const order: PermissionMode[] = ['default', 'acceptEdits', 'plan'];
+        const order: PermissionMode[] = ['default', 'acceptEdits', 'plan', 'auto'];
         const cur = rawSession.permissionMode() ?? 'default';
         const curIdx = Math.max(0, order.indexOf(cur));
         const targetIdx = order.indexOf(mode);
@@ -784,7 +786,7 @@
   const togglePermissionMode = () => {
     const s = session.value;
     if (!s) return;
-    const order: PermissionMode[] = ['default', 'acceptEdits', 'plan'];
+    const order: PermissionMode[] = ['default', 'acceptEdits', 'plan', 'auto'];
     const cur = (s.permissionMode.value as PermissionMode) ?? 'default';
     const idx = Math.max(0, order.indexOf(cur));
     const next = order[(idx + 1) % order.length];
@@ -994,6 +996,11 @@
   }
 
   .messages-inner {
+    width: 100%;
+    min-height: 100%;
+  }
+
+  .messages-thread {
     max-width: 1400px;
     width: 100%;
     margin: 0 auto;
@@ -1074,9 +1081,6 @@
   /* */
   .inputContainer {
     padding: 0px 12px;
-  }
-
-  .inputContainer {
     flex-shrink: 0;
     max-width: 1400px;
     width: 100%;
