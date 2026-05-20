@@ -30,15 +30,10 @@
         :data-message-id="message.id"
       >
         <div class="queue-item-content">
-          <div style="max-height: 56px; mask-image: none;">
-            <div
-              class="aislash-editor-input-readonly"
-              contenteditable="false"
-              :title="message.content"
-            >
-              <p><span>{{ message.content }}</span></p>
-            </div>
-          </div>
+          <div
+            class="aislash-editor-input-readonly"
+            :title="message.content"
+          >{{ message.content }}</div>
         </div>
 
         <div class="queue-item-actions">
@@ -137,30 +132,18 @@ function toggleExpanded() {
 }
 
 .aislash-editor-input-readonly {
-  resize: none;
-  grid-area: 1 / 1 / 1 / 1;
   overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   line-height: 1.5;
   font-family: inherit;
   font-size: 12px;
   font-style: italic;
   opacity: 0.8;
   color: var(--vscode-input-placeholderForeground);
-  background-color: transparent;
-  display: block;
-  outline: none;
-  scrollbar-width: none;
-  box-sizing: border-box;
-  border: none;
-  overflow-wrap: break-word;
   word-break: break-word;
-  padding: 0px;
   user-select: text;
-  white-space: pre-wrap;
-}
-
-.aislash-editor-input-readonly p {
-  margin: 0;
 }
 
 .queue-item-actions {
