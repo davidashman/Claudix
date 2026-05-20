@@ -29,6 +29,7 @@
             </div>
           </template>
           <template v-else>
+            <div v-if="firstSectionScrolledOff" class="history-above-line" />
             <template v-for="section in chatSections" :key="section.key">
               <!-- Pre-section: messages before the first user prompt -->
               <template v-if="section.header === null">
@@ -116,6 +117,8 @@
               ref="chatInputRef"
               :show-progress="true"
               :progress-percentage="progressPercentage"
+              :context-tokens="usageComputed.contextTokens"
+              :context-window="usageComputed.contextWindow"
               :context-tooltip="contextTooltip"
               :conversation-working="isBusy"
               :attachments="attachments"
@@ -124,7 +127,6 @@
               :selected-model="session?.modelSelection.value"
               :selected-agent="session?.agentSelection.value"
               :hide-controls="isTerminalMode"
-              :rate-limit-info="rateLimitInfo"
               @submit="handleSubmit"
               @stop="handleStop"
               @add-attachment="handleAddAttachment"
@@ -385,7 +387,6 @@
 
   const progressPercentage = computed(() => usageComputed.value.percentage);
 
-  const rateLimitInfo = computed(() => session.value?.rateLimitInfo.value);
 
   const contextTooltip = computed(() => {
     const { contextTokens, contextWindow } = usageComputed.value;
@@ -452,6 +453,8 @@
   // Scroll state management
   const showJumpToLatest = ref(false);
   const isUserScrolledUp = ref(false);
+  const hasContentAbove = ref(false);
+  const firstSectionScrolledOff = ref(false);
 
   function stringify(m: any): string {
     try {
@@ -469,6 +472,16 @@
   function checkScrollPosition(): void {
     const container = containerEl.value;
     if (!container) return;
+    hasContentAbove.value = container.scrollTop > 0;
+
+    // Show the history line only once the first chat-section has fully scrolled off the top.
+    const firstSection = container.querySelector<HTMLElement>('.chat-section');
+    if (firstSection) {
+      const containerTop = container.getBoundingClientRect().top;
+      firstSectionScrolledOff.value = firstSection.getBoundingClientRect().bottom <= containerTop;
+    } else {
+      firstSectionScrolledOff.value = false;
+    }
 
     // Check whether actual message content is scrolled below the visible area.
     // Using scrollHeight would count the minHeight padding on the last section as
@@ -525,6 +538,7 @@
   }
 
   watch(session, async () => {
+    firstSectionScrolledOff.value = false;
     await nextTick();
     scrollToBottom(true); // Force scroll on session change
     chatInputRef.value?.focus();
@@ -1257,5 +1271,44 @@
     47%  { transform: rotate(190deg); animation-timing-function: ease-in; }
     53%  { transform: rotate(180deg); animation-timing-function: ease-in; }
     100% { transform: rotate(180deg); }
+  }
+
+  .fake-prompt-peek {
+    position: sticky;
+    top: 0;
+    z-index: 11;
+    height: 3px;
+    margin: 0 12px -6px;
+    flex-shrink: 0;
+    pointer-events: none;
+    background-color: color-mix(in srgb, var(--vscode-input-background) 50%, transparent);
+    border-left: 1px solid color-mix(in srgb, var(--vscode-foreground) 30%, transparent);
+    border-right: 1px solid color-mix(in srgb, var(--vscode-foreground) 30%, transparent);
+    border-bottom: 1px solid color-mix(in srgb, var(--vscode-foreground) 30%, transparent);
+    border-radius: 0 0 6px 6px;
+  }
+
+  .prompt-peek-enter-active,
+  .prompt-peek-leave-active {
+    transition: opacity 0.15s ease;
+  }
+
+  .prompt-peek-enter-from,
+  .prompt-peek-leave-to {
+    opacity: 0;
+  }
+
+  .history-above-line {
+    position: sticky;
+    top: 0;
+    z-index: 11;
+    height: 6px;
+    flex-shrink: 0;
+    pointer-events: none;
+    background: linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--vscode-focusBorder) 40%, transparent) 0px,
+      transparent 100%
+    );
   }
 </style>

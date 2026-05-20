@@ -430,6 +430,7 @@ export class ClaudeSdkService implements IClaudeSdkService {
             '--include-partial-messages',
         ];
 
+        if (canUseTool) args.push('--permission-prompt-tool', 'stdio');
         if (resume) args.push('--resume', resume);
         if (agent) args.push('--agent', agent);
 

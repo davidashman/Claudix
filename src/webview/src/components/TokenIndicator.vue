@@ -1,9 +1,7 @@
 <template>
   <Tooltip :content="tooltipText" side="top" :side-offset="6">
-    <div
-      class="progress-container"
-      :style="{ width: size, height: size, paddingBottom: `${STROKE_WIDTH}px` }"
-    >
+    <div class="token-indicator">
+      <span v-if="contextLabel" class="context-label">{{ contextLabel }}</span>
       <div class="progress-circle">
         <svg :width="size" :height="size" class="progress-svg">
           <circle
@@ -41,6 +39,8 @@ import Tooltip from './Common/Tooltip.vue'
 
 interface Props {
   percentage: number
+  contextTokens?: number
+  contextWindow?: number
   contextTooltip?: string
   size?: number
 }
@@ -62,6 +62,17 @@ const circumference = computed(() => {
 const strokeOffset = computed(() => {
   const progress = Math.max(0, Math.min(100, props.percentage))
   return circumference.value - (progress / 100) * circumference.value
+})
+
+const fmt = (n: number, f = 1) => {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(f)}M`
+  if (n >= 1_000) return `${(n / 1_000).toFixed(f)}K`
+  return `${n}`
+}
+
+const contextLabel = computed(() => {
+  if (props.contextTokens == null || props.contextWindow == null) return undefined
+  return `${fmt(props.contextTokens)} / ${fmt(props.contextWindow, 0)}`
 })
 
 const formattedPercentage = computed(() => {
@@ -87,16 +98,31 @@ const strokeColor = computed(() => {
 </script>
 
 <style scoped>
-.progress-container {
+.token-indicator {
   display: flex;
   align-items: center;
+  gap: 4px;
 }
 
-.progress-svg {
-  position: absolute;
+.progress-circle {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  margin-bottom: 2px;
 }
 
 .progress-arc {
   transition: stroke-dashoffset 0.3s ease;
+}
+
+.context-label {
+  font-size: 12px;
+  font-weight: 400;
+  opacity: 0.45;
+  white-space: nowrap;
+  color: var(--vscode-foreground);
+  height: 13px;
+  line-height: 13px;
+  font-variant-numeric: tabular-nums;
 }
 </style>

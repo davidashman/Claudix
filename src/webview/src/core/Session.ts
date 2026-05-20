@@ -28,7 +28,7 @@ export interface UsageData {
 }
 
 export interface RateLimitInfo {
-  utilization: number;          // 0–1
+  utilization?: number;         // 0–1; absent when API doesn't return it
   rateLimitType: string;        // 'five_hour' | 'seven_day' | ...
   resetsAt?: number;            // unix epoch seconds
   status: string;               // 'allowed' | 'allowed_warning' | 'rejected'
@@ -907,11 +907,11 @@ export class Session {
       }
     }
 
-    if (event?.type === 'rate_limit_event' && event.rate_limit_info) {
+    if (event?.type === 'rate_limit_event') {
       const info = event.rate_limit_info;
-      if (typeof info.utilization === 'number' && info.rateLimitType) {
+      if (info?.rateLimitType) {
         this.rateLimitInfo({
-          utilization: info.utilization,
+          utilization: typeof info.utilization === 'number' ? info.utilization : undefined,
           rateLimitType: info.rateLimitType,
           resetsAt: info.resetsAt,
           status: info.status ?? 'allowed',

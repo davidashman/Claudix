@@ -84,17 +84,11 @@
         </Tooltip>
       </div>
       <div class="controls-right">
-        <RateLimitIndicator
-          v-if="rateLimitInfo"
-          :utilization="rateLimitInfo.utilization"
-          :rate-limit-type="rateLimitInfo.rateLimitType"
-          :resets-at="rateLimitInfo.resetsAt"
-          :status="rateLimitInfo.status"
-          :size="19"
-        />
         <TokenIndicator
           v-if="showProgress"
           :percentage="progressPercentage"
+          :context-tokens="contextTokens"
+          :context-window="contextWindow"
           :context-tooltip="contextTooltip"
           :size="19"
         />
@@ -191,8 +185,6 @@ import ButtonArea from './ButtonArea.vue'
 import ModeSelect from './ModeSelect.vue'
 import ModelEffortSelect from './ModelEffortSelect.vue'
 import TokenIndicator from './TokenIndicator.vue'
-import RateLimitIndicator from './RateLimitIndicator.vue'
-import type { RateLimitInfo } from '../core/Session'
 import type { AttachmentItem } from '../types/attachment'
 import { Dropdown, DropdownItem } from './Dropdown'
 import { RuntimeKey } from '../composables/runtimeContext'
@@ -205,6 +197,8 @@ import Tooltip from './Common/Tooltip.vue';
 interface Props {
   showProgress?: boolean
   progressPercentage?: number
+  contextTokens?: number
+  contextWindow?: number
   contextTooltip?: string
   placeholder?: string
   readonly?: boolean
@@ -216,7 +210,6 @@ interface Props {
   effortLevel?: string
   permissionMode?: PermissionMode
   hideControls?: boolean
-  rateLimitInfo?: RateLimitInfo
 }
 
 interface Emits {
@@ -244,7 +237,6 @@ const props = withDefaults(defineProps<Props>(), {
   effortLevel: undefined,
   permissionMode: 'default',
   hideControls: false,
-  rateLimitInfo: undefined,
 })
 
 const emit = defineEmits<Emits>()
