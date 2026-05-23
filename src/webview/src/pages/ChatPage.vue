@@ -1096,6 +1096,24 @@
 
   .modal-in-input {
     width: 100%;
+    position: relative;
+  }
+
+  .modal-in-input::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 20px;
+    background: linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--vscode-panel-background) 45%, transparent) 0%,
+      transparent 100%
+    );
+    border-radius: 8px 8px 0 0;
+    pointer-events: none;
+    z-index: 1;
   }
 
   .modal-in-input :deep(.permission-request-container) {
