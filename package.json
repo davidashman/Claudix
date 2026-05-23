@@ -48,21 +48,21 @@
           "enum": [
             "default",
             "acceptEdits",
-            "auto",
-            "plan"
+            "plan",
+            "auto"
           ],
           "default": "default",
           "enumItemLabels": [
             "Ask Permissions",
             "Accept Edits",
-            "Auto",
-            "Plan Mode"
+            "Plan Mode",
+            "Auto"
           ],
           "enumDescriptions": [
             "Prompt for permission on first use of each operation",
             "Automatically accept file edits and common operations",
-            "Automatically determine permissions based on context",
-            "Read-only mode, Claude can explore but not modify files"
+            "Read-only mode, Claude can explore but not modify files",
+            "Automatically determine permissions based on context"
           ],
           "description": "Default permission mode for new sessions",
           "order": 1

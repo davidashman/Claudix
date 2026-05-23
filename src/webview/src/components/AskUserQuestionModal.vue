@@ -206,12 +206,14 @@ function handleKeyDown(e: KeyboardEvent) {
   gap: 16px;
   padding: 16px;
   background: var(--vscode-editorWidget-background);
-  border-top: 1px solid var(--vscode-panel-border);
+  border: 1px solid var(--vscode-editorWidget-border);
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
   outline: none;
   min-height: 120px;
   max-height: 60vh;
   overflow-y: auto;
-  margin: 0px 10px;
+  margin: 0;
 }
 
 .tool-title {

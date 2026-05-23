@@ -680,6 +680,27 @@ function handlePaste(event: ClipboardEvent) {
       dataTransfer.items.add(file)
     }
     handleAddFiles(dataTransfer.files)
+    return
+  }
+
+  // For text pastes, insert plain text directly to avoid HTML from contenteditable default
+  const plainText = clipboard.getData('text/plain')
+  if (plainText) {
+    event.preventDefault()
+    const sel = window.getSelection()
+    if (sel && sel.rangeCount > 0) {
+      const range = sel.getRangeAt(0)
+      range.deleteContents()
+      const textNode = document.createTextNode(plainText)
+      range.insertNode(textNode)
+      range.setStartAfter(textNode)
+      range.collapse(true)
+      sel.removeAllRanges()
+      sel.addRange(range)
+    }
+    if (textareaRef.value) {
+      handleInput({ target: textareaRef.value } as unknown as Event)
+    }
   }
 }
 

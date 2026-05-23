@@ -94,20 +94,6 @@
         </div>
 
         <div class="inputContainer">
-          <AskUserQuestionModal
-            v-if="pendingPermission && toolContext && pendingPermission.toolName === 'AskUserQuestion'"
-            :request="pendingPermission"
-            :context="toolContext"
-            :on-resolve="handleResolvePermission"
-            data-permission-panel="1"
-          />
-          <PermissionRequestModal
-            v-else-if="pendingPermission && toolContext"
-            :request="pendingPermission"
-            :context="toolContext"
-            :on-resolve="handleResolvePermission"
-            data-permission-panel="1"
-          />
           <template v-if="!terminalInputHidden">
             <MessageQueueList
               :queued-messages="outboundQueue"
@@ -115,8 +101,25 @@
               @remove="handleQueueRemove"
               @send-now="handleQueueSendNow"
             />
+            <div v-if="pendingPermission && toolContext" class="modal-in-input">
+                <AskUserQuestionModal
+                  v-if="pendingPermission.toolName === 'AskUserQuestion'"
+                  :request="pendingPermission"
+                  :context="toolContext"
+                  :on-resolve="handleResolvePermission"
+                  data-permission-panel="1"
+                />
+                <PermissionRequestModal
+                  v-else
+                  :request="pendingPermission"
+                  :context="toolContext"
+                  :on-resolve="handleResolvePermission"
+                  data-permission-panel="1"
+                />
+            </div>
             <ChatInputBox
               ref="chatInputRef"
+              :class="{ 'input-hidden': !!(pendingPermission && toolContext) }"
               :show-progress="true"
               :progress-percentage="progressPercentage"
               :context-tokens="usageComputed.contextTokens"
@@ -998,6 +1001,8 @@
   .messages-inner {
     width: 100%;
     min-height: 100%;
+    display: flex;
+    flex-direction: column;
   }
 
   .messages-thread {
@@ -1089,6 +1094,20 @@
     z-index: 20;
   }
 
+  .modal-in-input {
+    width: 100%;
+  }
+
+  .modal-in-input :deep(.permission-request-container) {
+    border-radius: 8px;
+    border-bottom: 1px solid var(--vscode-editorWidget-border);
+  }
+
+  .input-hidden :deep(.full-input-box) {
+    display: none;
+  }
+
+
   /* */
   .emptyState {
     display: flex;
@@ -1097,6 +1116,11 @@
     justify-content: center;
     flex: 1;
     padding: 32px 16px;
+    max-width: 1400px;
+    width: 100%;
+    height: 100%;
+    margin: 0 auto;
+    min-height: 100%;
   }
 
   .emptyWordmark {
