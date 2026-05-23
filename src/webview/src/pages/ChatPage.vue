@@ -93,6 +93,23 @@
           </div>
         </div>
 
+        <div v-if="pendingPermission && toolContext" class="modal-in-input">
+          <AskUserQuestionModal
+            v-if="pendingPermission.toolName === 'AskUserQuestion'"
+            :request="pendingPermission"
+            :context="toolContext"
+            :on-resolve="handleResolvePermission"
+            data-permission-panel="1"
+          />
+          <PermissionRequestModal
+            v-else
+            :request="pendingPermission"
+            :context="toolContext"
+            :on-resolve="handleResolvePermission"
+            data-permission-panel="1"
+          />
+        </div>
+
         <div class="inputContainer">
           <template v-if="!terminalInputHidden">
             <MessageQueueList
@@ -101,22 +118,6 @@
               @remove="handleQueueRemove"
               @send-now="handleQueueSendNow"
             />
-            <div v-if="pendingPermission && toolContext" class="modal-in-input">
-                <AskUserQuestionModal
-                  v-if="pendingPermission.toolName === 'AskUserQuestion'"
-                  :request="pendingPermission"
-                  :context="toolContext"
-                  :on-resolve="handleResolvePermission"
-                  data-permission-panel="1"
-                />
-                <PermissionRequestModal
-                  v-else
-                  :request="pendingPermission"
-                  :context="toolContext"
-                  :on-resolve="handleResolvePermission"
-                  data-permission-panel="1"
-                />
-            </div>
             <ChatInputBox
               ref="chatInputRef"
               :class="{ 'input-hidden': !!(pendingPermission && toolContext) }"
@@ -1043,7 +1044,7 @@
     word-wrap: break-word;
   }
 
-.spinnerRow {
+  .spinnerRow {
     padding-left: 16px;
     display: flex;
     align-items: center;
@@ -1095,25 +1096,21 @@
   }
 
   .modal-in-input {
-    width: 100%;
-    position: relative;
-  }
-
-  .modal-in-input::before {
-    content: '';
     position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 20px;
+    bottom: 35px;
+    left: 12px;
+    right: 12px;
+    z-index: 25;
+    max-width: 1376px;
+    margin: 0 auto;
+    padding-top: 7px;
+    padding-bottom: 1px;
     background: linear-gradient(
       to bottom,
-      color-mix(in srgb, var(--vscode-panel-background) 45%, transparent) 0%,
-      transparent 100%
+      transparent 0%,
+      var(--vscode-panel-background) 14px,
+      var(--vscode-panel-background) 100%
     );
-    border-radius: 8px 8px 0 0;
-    pointer-events: none;
-    z-index: 1;
   }
 
   .modal-in-input :deep(.permission-request-container) {
@@ -1197,7 +1194,7 @@
     display: flex;
     justify-content: center;
     pointer-events: none;
-    z-index: 100;
+    z-index: 20;
     margin-top: -48px; /* Negative margin to overlay content */
   }
 

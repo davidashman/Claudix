@@ -298,13 +298,21 @@ export class Session {
     this.currentConnectionPromise = this.connectionProvider().then((conn) => {
       this.connection(conn);
       return conn;
+    }).catch((err) => {
+      this.currentConnectionPromise = undefined;
+      throw err;
     });
 
     return this.currentConnectionPromise;
   }
 
   async preloadConnection(): Promise<void> {
-    await this.getConnection();
+    try {
+      await this.getConnection();
+    } catch (err) {
+      this.error(err instanceof Error ? err.message : String(err));
+      return;
+    }
     if ((window as any).RELAY_BOOTSTRAP?.terminalMode) return;
     await this.launchClaude();
   }

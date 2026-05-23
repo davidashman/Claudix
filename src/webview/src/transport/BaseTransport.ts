@@ -104,7 +104,15 @@ export abstract class BaseTransport {
   }
 
   async initialize(): Promise<void> {
-    const initResponse = await this.sendRequest<InitResponse>({ type: "init" });
+    const INIT_TIMEOUT_MS = 10_000;
+    const initResponse = await Promise.race([
+      this.sendRequest<InitResponse>({ type: "init" }),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error(
+          'Extension not responding. Try reloading the window (Developer: Reload Window).'
+        )), INIT_TIMEOUT_MS)
+      ),
+    ]);
     console.log('[BaseTransport.init] Received modelSetting from backend:', initResponse.state.modelSetting);
     this.config({
       defaultCwd: initResponse.state.defaultCwd,
