@@ -142,6 +142,7 @@ export class Session {
   readonly cwd = signal<string | undefined>(undefined);
   readonly permissionMode = signal<PermissionMode>('default');
   private prePlanMode: PermissionMode | null = null;
+  private _permissionModeInitialized = false;
   readonly summary = signal<string | undefined>(undefined);
   readonly modelSelection = signal<string | undefined>(undefined);
   readonly agentSelection = signal<string | undefined>(undefined);
@@ -257,12 +258,13 @@ export class Session {
     });
 
 
-    // Initialize permissionMode from config when it becomes available (one-shot)
-    let modeInitialized = false;
+    // Initialize permissionMode from config when it becomes available (one-shot).
+    // Uses _permissionModeInitialized so launchClaude() can also do this synchronously
+    // (effects fire asynchronously and may not run before launchClaude reads the signal).
     effect(() => {
       const configMode = this.config()?.permissionMode;
-      if (configMode && !modeInitialized) {
-        modeInitialized = true;
+      if (configMode && !this._permissionModeInitialized) {
+        this._permissionModeInitialized = true;
         console.log('[Session] Setting permissionMode from config to:', configMode);
         this.permissionMode(configMode as PermissionMode);
       }
@@ -620,6 +622,15 @@ export class Session {
       this.thinkingLevel(connection.config()?.thinkingLevel || 'default_on');
     }
 
+    // Initialize permissionMode synchronously here — the reactive effect in the
+    // constructor fires asynchronously and may not have run yet at this point.
+    if (!this._permissionModeInitialized) {
+      this._permissionModeInitialized = true;
+      const configMode = connection.config()?.permissionMode;
+      if (configMode) {
+        this.permissionMode(configMode as PermissionMode);
+      }
+    }
 
     // Resume from the latest SDK-assigned branch if we have one; otherwise
     // resume from the stable (persisted) sessionId.

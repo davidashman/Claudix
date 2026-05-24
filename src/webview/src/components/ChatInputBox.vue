@@ -1126,8 +1126,7 @@ defineExpose({
   font-size: 10px;
   line-height: 1;
   padding: 2px 6px;
-  margin-right: 4px;
-  margin-bottom: 2px;
+  margin: 0px 6px;
   border-radius: 10px;
   background: color-mix(in srgb, var(--vscode-foreground) 25%, transparent);
   color: var(--vscode-foreground);

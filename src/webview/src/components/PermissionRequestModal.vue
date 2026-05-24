@@ -197,7 +197,7 @@ useKeybinding([
   padding: 12px;
   background: var(--vscode-editorWidget-background, color-mix(in srgb, var(--vscode-foreground) 5%, var(--vscode-editor-background)));
   border-radius: 8px 8px 0 0;
-  border: 1px solid var(--vscode-editorWidget-border);
+  border: 1px solid #3794ff;
   border-bottom: none;
 }
 

@@ -230,7 +230,7 @@
       return 'relay-icon-working';
     }
 
-    return 'relay-icon-waiting';
+    return 'relay-icon-idle';
   })
 
   // Only these tool types are collapsed into a group; others render individually
@@ -1115,7 +1115,7 @@
 
   .modal-in-input :deep(.permission-request-container) {
     border-radius: 8px;
-    border-bottom: 1px solid var(--vscode-editorWidget-border);
+    border-bottom: 1px solid #3794ff;
   }
 
   .input-hidden :deep(.full-input-box) {
@@ -1295,6 +1295,10 @@
 
   .relay-icon-pending {
     color: #3794ff;
+  }
+
+  .relay-icon-idle {
+    color: #808080;
   }
 
   @keyframes relay-squeeze {

@@ -206,7 +206,7 @@ function handleKeyDown(e: KeyboardEvent) {
   gap: 16px;
   padding: 16px;
   background: var(--vscode-editorWidget-background);
-  border: 1px solid var(--vscode-editorWidget-border);
+  border: 1px solid #3794ff;
   border-bottom: none;
   border-radius: 8px 8px 0 0;
   outline: none;

@@ -21,7 +21,34 @@ const props = defineProps<Props>();
 
 const runtime = inject(RuntimeKey);
 
+const copyIconSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
+const checkIconSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
 function handleLinkClick(event: MouseEvent) {
+  const copyBtn = (event.target as HTMLElement).closest('.copy-btn');
+  if (copyBtn) {
+    event.stopPropagation();
+    const wrapper = copyBtn.closest('.copy-wrapper');
+    const content = wrapper?.querySelector('pre code, blockquote');
+    if (content) {
+      navigator.clipboard.writeText(content.textContent ?? '').then(() => {
+        const btn = copyBtn as HTMLElement;
+        const original = btn.innerHTML;
+        btn.innerHTML = checkIconSvg;
+        setTimeout(() => { btn.innerHTML = original; }, 1500);
+      });
+    }
+    return;
+  }
+
   const target = (event.target as HTMLElement).closest('a');
   if (!target) return;
 
@@ -63,10 +90,24 @@ marked.setOptions({
 });
 
 const renderer = new marked.Renderer();
+
 renderer.link = ({ href, title, text }) => {
   const titleAttr = title ? ` title="${title}"` : '';
   // Use data-href so VSCode's webview doesn't intercept external link navigation
   return `<a data-href="${href}"${titleAttr}>${text}</a>`;
+};
+
+renderer.code = ({ text, lang }) => {
+  const langClass = lang ? ` class="language-${lang}"` : '';
+  const singleLine = !text.includes('\n');
+  const wrapperClass = singleLine ? 'copy-wrapper single-line' : 'copy-wrapper';
+  return `<div class="${wrapperClass}"><pre><code${langClass}>${escapeHtml(text)}</code></pre><button class="copy-btn" aria-label="Copy">${copyIconSvg}</button></div>`;
+};
+
+renderer.blockquote = ({ text }) => {
+  const singleLine = !text.includes('<br') && (text.match(/<p>/g) ?? []).length <= 1;
+  const wrapperClass = singleLine ? 'copy-wrapper single-line' : 'copy-wrapper';
+  return `<div class="${wrapperClass}"><blockquote>${text}</blockquote><button class="copy-btn" aria-label="Copy">${copyIconSvg}</button></div>`;
 };
 
 // Markdown
@@ -206,5 +247,41 @@ const renderedMarkdown = computed(() => {
 .markdown-content :deep(th) {
   background-color: color-mix(in srgb, var(--vscode-editor-background) 30%, transparent);
   font-weight: 600;
+}
+
+.markdown-content :deep(.copy-wrapper) {
+  position: relative;
+}
+
+.markdown-content :deep(.copy-wrapper pre),
+.markdown-content :deep(.copy-wrapper blockquote) {
+  padding-right: 36px;
+}
+
+.markdown-content :deep(.copy-btn) {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: color-mix(in srgb, var(--vscode-editor-background) 85%, transparent);
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 4px;
+  padding: 3px 5px;
+  cursor: pointer;
+  color: var(--vscode-editor-foreground);
+  opacity: 0.35;
+  transition: opacity 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.markdown-content :deep(.copy-btn:hover) {
+  opacity: 1;
+}
+
+.markdown-content :deep(.copy-wrapper.single-line .copy-btn) {
+  top: 50%;
+  transform: translateY(-50%);
 }
 </style>
