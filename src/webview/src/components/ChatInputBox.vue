@@ -1132,7 +1132,7 @@ defineExpose({
   color: var(--vscode-foreground);
   opacity: 0.7;
   white-space: nowrap;
-  max-width: 120px;
+  max-width: 200px;
   overflow: hidden;
   text-overflow: ellipsis;
   cursor: default;

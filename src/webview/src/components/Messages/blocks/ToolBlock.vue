@@ -31,6 +31,7 @@ import MultiEditTool from './tools/MultiEdit.vue';
 import NotebookEditTool from './tools/NotebookEdit.vue';
 import SlashCommandTool from './tools/SlashCommand.vue';
 import AgentTool from './tools/Agent.vue';
+import TaskOutputTool from './tools/TaskOutput.vue';
 import TodoWriteTool from './tools/TodoWrite.vue';
 import WebFetchTool from './tools/WebFetch.vue';
 import WebSearchTool from './tools/WebSearch.vue';
@@ -100,6 +101,8 @@ const toolComponent = computed(() => {
     case 'Agent':
     case 'Task':
       return AgentTool;
+    case 'TaskOutput':
+      return TaskOutputTool;
     case 'TodoWrite':
       return TodoWriteTool;
     case 'WebFetch':

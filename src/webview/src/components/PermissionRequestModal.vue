@@ -9,12 +9,9 @@
       <span class="codicon codicon-robot"></span>
       <span>{{ props.request.agentName }}</span>
     </div>
-    <div class="tool-title">
-      <span class="codicon" :class="toolIcon"></span>
-      <span class="tool-name">{{ toolLabel }}</span>
-      <span v-if="toolDescription" class="tool-description" :title="toolDescription">{{ toolDescription }}</span>
+    <div class="tool-preview">
+      <ToolBlock :block="fakeBlock" :context="props.context" />
     </div>
-    <div v-if="isPlanMode && renderedPlan" class="plan-review-content" v-html="renderedPlan"></div>
     <div class="permission-header">Do you approve?</div>
     <input
       ref="inputRef"
@@ -47,11 +44,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
-import { marked } from 'marked';
+import { ref, computed, provide, onMounted } from 'vue';
 import type { PermissionRequest } from '../core/PermissionRequest';
 import type { ToolContext } from '../types/tool';
 import { useKeybinding } from '../utils/useKeybinding';
+import ToolBlock from './Messages/blocks/ToolBlock.vue';
 
 interface Props {
   request: PermissionRequest;
@@ -60,6 +57,11 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+
+const isPlanMode = computed(() => props.request.toolName === 'ExitPlanMode');
+provide('toolForceCollapsed', !isPlanMode.value);
+provide('toolForceExpanded', isPlanMode.value);
+provide('toolHideStatusIndicator', true);
 
 const containerRef = ref<HTMLDivElement | null>(null);
 const inputRef = ref<HTMLInputElement | null>(null);
@@ -78,60 +80,12 @@ const showSecondButton = computed(
   () => props.request.suggestions && props.request.suggestions.length > 0
 );
 
-const TOOL_ICONS: Record<string, string> = {
-  Bash: 'codicon-terminal',
-  Read: 'codicon-eye-two',
-  Edit: 'codicon-edit',
-  Write: 'codicon-new-file',
-  MultiEdit: 'codicon-edit',
-  Task: 'codicon-tasklist',
-  TodoWrite: 'codicon-checklist',
-  Glob: 'codicon-list-tree',
-  Grep: 'codicon-search',
-  WebFetch: 'codicon-globe',
-  WebSearch: 'codicon-globe',
-  KillShell: 'codicon-terminal-kill',
-  NotebookEdit: 'codicon-notebook',
-  ExitPlanMode: 'codicon-milestone',
-};
-
-const toolIcon = computed(() => TOOL_ICONS[props.request.toolName] ?? 'codicon-tools');
-
-const TOOL_LABELS: Record<string, string> = {
-  MultiEdit: 'Edit',
-  TodoWrite: 'Todo',
-  WebFetch: 'Fetch',
-  WebSearch: 'Search',
-  KillShell: 'Kill Shell',
-  NotebookEdit: 'Notebook Edit',
-  ExitPlanMode: 'Plan Mode',
-};
-
-const toolLabel = computed(() => TOOL_LABELS[props.request.toolName] ?? props.request.toolName);
-
-const isPlanMode = computed(() => props.request.toolName === 'ExitPlanMode');
-
-const renderedPlan = computed(() => {
-  if (!isPlanMode.value) return '';
-  const plan = props.request.inputs.plan as string | undefined;
-  if (!plan) return '';
-  return marked(plan) as string;
-});
-
-const toolDescription = computed(() => {
-  const inputs = props.request.inputs as Record<string, unknown>;
-  const name = props.request.toolName;
-  if (name === 'Bash') return (inputs.description as string) || (inputs.command as string) || '';
-  if (name === 'Task' || name === 'Agent') return (inputs.description as string) || '';
-  if (name === 'WebSearch') return (inputs.query as string) || '';
-  if (name === 'WebFetch') {
-    return (inputs.url as string) || '';
-  }
-  if (name === 'Glob') return (inputs.pattern as string) || '';
-  if (name === 'Grep') return (inputs.pattern as string) || '';
-  if (inputs.file_path) return (inputs.file_path as string).split('/').pop() || '';
-  return '';
-});
+const fakeBlock = computed(() => ({
+  type: 'tool_use' as const,
+  id: 'permission-preview',
+  name: props.request.toolName,
+  input: props.request.inputs,
+}));
 
 const handleApprove = () => {
   props.onResolve(props.request, true);
@@ -218,32 +172,8 @@ useKeybinding([
   font-size: 12px;
 }
 
-.tool-title {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 3px 0;
-}
-
-.tool-title .codicon {
-  font-size: 16px;
-  flex-shrink: 0;
-  color: var(--vscode-foreground);
-}
-
-.tool-name {
-  font-weight: 500;
-  font-size: 1em;
-  color: var(--vscode-foreground);
-}
-
-.tool-description {
-  font-size: 1em;
-  font-style: italic;
-  color: color-mix(in srgb, var(--vscode-foreground) 60%, transparent);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.tool-preview {
+  margin: 0 -4px;
 }
 
 .permission-header {
@@ -341,54 +271,9 @@ useKeybinding([
   flex-direction: column;
 }
 
-.plan-review-content {
+.plan-modal .tool-preview {
   flex: 1;
   overflow-y: auto;
   min-height: 0;
-  font-size: 0.95em;
-  line-height: 1.6;
-  color: var(--vscode-editor-foreground);
-  padding: 4px 2px;
-}
-
-.plan-review-content :deep(h1),
-.plan-review-content :deep(h2),
-.plan-review-content :deep(h3) {
-  font-weight: 600;
-  margin-top: 12px;
-  margin-bottom: 6px;
-  color: var(--vscode-foreground);
-}
-
-.plan-review-content :deep(h1:first-child),
-.plan-review-content :deep(h2:first-child),
-.plan-review-content :deep(h3:first-child) {
-  margin-top: 0;
-}
-
-.plan-review-content :deep(h1) { font-size: 1.2em; }
-.plan-review-content :deep(h2) { font-size: 1.1em; }
-.plan-review-content :deep(h3) { font-size: 1em; }
-
-.plan-review-content :deep(p) {
-  margin-bottom: 6px;
-}
-
-.plan-review-content :deep(ul),
-.plan-review-content :deep(ol) {
-  margin-bottom: 6px;
-  padding-left: 20px;
-}
-
-.plan-review-content :deep(li) {
-  margin-bottom: 3px;
-}
-
-.plan-review-content :deep(code) {
-  background-color: color-mix(in srgb, var(--vscode-textCodeBlock-background) 50%, transparent);
-  padding: 1px 4px;
-  border-radius: 3px;
-  font-family: var(--vscode-editor-font-family, monospace);
-  font-size: 0.9em;
 }
 </style>

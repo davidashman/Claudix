@@ -57,6 +57,16 @@
         :context="context"
       />
 
+      <div v-if="backgroundOutputs.length > 0" class="background-outputs">
+        <div v-for="(output, idx) in backgroundOutputs" :key="idx" class="background-output">
+          <div class="section-header">
+            <span class="codicon codicon-output"></span>
+            <span>Background output</span>
+          </div>
+          <pre class="prompt-content">{{ output }}</pre>
+        </div>
+      </div>
+
       <ToolError :tool-result="toolResult" />
     </div>
 
@@ -118,6 +128,12 @@ const children = (
     ? useSignal(props.wrapper.childTools)
     : ref<ContentBlockWrapper[]>([])
 ) as Ref<ContentBlockWrapper[]>;
+
+const backgroundOutputs = (
+  props.wrapper
+    ? useSignal(props.wrapper.backgroundOutputs)
+    : ref<string[]>([])
+) as Ref<string[]>;
 
 const latestChild = computed(
   () => children.value[children.value.length - 1]

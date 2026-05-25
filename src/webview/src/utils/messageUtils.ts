@@ -148,6 +148,23 @@ export function processAndAttachMessage(messages: Message[], rawEvent: any): voi
                     if (rawEvent.toolUseResult) {
                         toolUseWrapper.toolUseResult = rawEvent.toolUseResult;
                     }
+
+                    // If this is a TaskOutput result, attach the output to the originating background tool block
+                    if (toolUseWrapper.content.type === 'tool_use') {
+                        const toolUse = toolUseWrapper.content as ToolUseContentBlock;
+                        if (toolUse.name === 'TaskOutput') {
+                            const taskId = toolUse.input?.task_id as string | undefined;
+                            if (taskId) {
+                                const bgWrapper = findBackgroundToolByTaskId(messages, taskId);
+                                if (bgWrapper) {
+                                    const outputText = extractContentText(block.content);
+                                    if (outputText) {
+                                        bgWrapper.addBackgroundOutput(outputText);
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -435,4 +452,65 @@ export function estimateTokenCount(message: any): number {
     const text = extractMessageText(message);
     // 1 token ≈ 4
     return Math.ceil(text.length / 4);
+}
+
+/**
+ * Find any tool_use wrapper whose background launch result references the given task_id.
+ * Covers both Agent/Task (agentId) and Bash (backgroundTaskId) background tools.
+ */
+export function findBackgroundToolByTaskId(messages: Message[], taskId: string): ContentBlockWrapper | undefined {
+    for (let i = messages.length - 1; i >= 0; i--) {
+        const message = messages[i];
+        if (message.type === 'assistant') {
+            const content = message.message.content;
+            if (Array.isArray(content)) {
+                for (const wrapper of content) {
+                    const found = findBackgroundToolInWrapper(wrapper, taskId);
+                    if (found) return found;
+                }
+            }
+        }
+    }
+    return undefined;
+}
+
+function findBackgroundToolInWrapper(
+    wrapper: ContentBlockWrapper,
+    taskId: string
+): ContentBlockWrapper | undefined {
+    if (wrapper.content.type === 'tool_use') {
+        const tur = wrapper.toolUseResult as any;
+        // Agent/Task background: toolUseResult.agentId or toolResult.content.agentId
+        if (tur?.agentId === taskId) return wrapper;
+        // Bash background: toolUseResult.backgroundTaskId
+        if (tur?.backgroundTaskId === taskId) return wrapper;
+        // Fallback: parse toolResult.content for either field
+        const tr = wrapper.getToolResultValue();
+        if (tr) {
+            const parsed = parseJsonContent(tr.content);
+            if (parsed?.agentId === taskId || parsed?.backgroundTaskId === taskId) return wrapper;
+        }
+    }
+    for (const child of wrapper.getChildToolsValue()) {
+        const found = findBackgroundToolInWrapper(child, taskId);
+        if (found) return found;
+    }
+    return undefined;
+}
+
+function parseJsonContent(content: any): Record<string, any> | undefined {
+    if (!content) return undefined;
+    if (typeof content === 'string') {
+        try { return JSON.parse(content); } catch { return undefined; }
+    }
+    if (typeof content === 'object' && !Array.isArray(content)) return content;
+    return undefined;
+}
+
+export function extractContentText(content: any): string {
+    if (!content) return '';
+    if (typeof content === 'string') return content;
+    if (Array.isArray(content)) return content.map((c: any) => c?.text ?? '').join('');
+    if (typeof content === 'object' && content.text) return String(content.text);
+    return JSON.stringify(content);
 }

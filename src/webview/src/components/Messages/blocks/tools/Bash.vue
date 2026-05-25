@@ -21,23 +21,37 @@
         <pre class="output-content">{{ outputContent }}</pre>
       </div>
 
+      <div v-for="(bgOutput, idx) in backgroundOutputs" :key="idx" class="bash-output">
+        <div class="output-header">Background output</div>
+        <pre class="output-content">{{ bgOutput }}</pre>
+      </div>
+
       <ToolError :tool-result="toolResult" />
     </template>
   </ToolMessageWrapper>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref, type Ref } from 'vue';
+import { useSignal } from '@gn8/alien-signals-vue';
 import ToolMessageWrapper from './common/ToolMessageWrapper.vue';
 import ToolError from './common/ToolError.vue';
+import type { ContentBlockWrapper } from '@/models/ContentBlockWrapper';
 
 interface Props {
   toolUse?: any;
   toolResult?: any;
   toolUseResult?: any;
+  wrapper?: ContentBlockWrapper;
 }
 
 const props = defineProps<Props>();
+
+const backgroundOutputs = (
+  props.wrapper
+    ? useSignal(props.wrapper.backgroundOutputs)
+    : ref<string[]>([])
+) as Ref<string[]>;
 
 const command = computed(() => {
   return props.toolUse?.input?.command || '';

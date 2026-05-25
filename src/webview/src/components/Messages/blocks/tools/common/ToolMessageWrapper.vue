@@ -38,6 +38,7 @@
         <span v-if="inCollapsedGroup && toolGroupCount > 0" class="tool-count-badge">+{{ toolGroupCount }}</span>
 
         <ToolStatusIndicator
+          v-if="!hideStatusIndicator"
           :state="indicatorState"
           class="status-indicator-trailing"
         />
@@ -88,6 +89,9 @@ defineEmits<{
   deny: [];
 }>();
 
+const forceCollapsed = inject<boolean>('toolForceCollapsed', false);
+const forceExpanded = inject<boolean>('toolForceExpanded', false);
+const hideStatusIndicator = inject<boolean>('toolHideStatusIndicator', false);
 const runtime = inject(RuntimeKey);
 const slots = useSlots();
 const toolGroupExpanded = inject<Ref<boolean> | null>('toolGroupExpanded', null);
@@ -115,6 +119,9 @@ const isExpanded = computed({
     if (userToggled.value) {
       return userToggledState.value;
     }
+    // When hosted in the permission modal, start collapsed or expanded based on tool type
+    if (forceExpanded) return true;
+    if (forceCollapsed) return false;
     // Permission pending: always expand so user can see what to approve
     if (props.permissionState === 'pending') return true;
     // Errors always expand regardless of setting

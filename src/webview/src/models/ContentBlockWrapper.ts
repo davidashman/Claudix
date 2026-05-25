@@ -100,4 +100,23 @@ export class ContentBlockWrapper {
   getChildToolsValue(): ContentBlockWrapper[] {
     return this.childToolsSignal();
   }
+
+  /**
+   * Output strings captured from TaskOutput calls that reference this Agent.
+   * Populated reactively when the parent agent calls TaskOutput with a
+   * task_id matching this wrapper's agentId.
+   */
+  private readonly backgroundOutputsSignal = signal<string[]>([]);
+
+  get backgroundOutputs() {
+    return this.backgroundOutputsSignal;
+  }
+
+  addBackgroundOutput(text: string): void {
+    this.backgroundOutputsSignal([...this.backgroundOutputsSignal(), text]);
+  }
+
+  getBackgroundOutputsValue(): string[] {
+    return this.backgroundOutputsSignal();
+  }
 }
