@@ -13,6 +13,7 @@
       </slot>
     </div>
 
+    <Teleport to="body">
     <div
       v-if="isVisible"
       ref="dropdownRef"
@@ -57,13 +58,14 @@
       </div>
     </div>
 
-  </div>
+    <div
+      v-if="isVisible && closeOnClickOutside"
+      class="dropdown-trigger-backdrop"
+      @click="closeDropdown"
+    ></div>
+    </Teleport>
 
-  <div
-    v-if="isVisible && closeOnClickOutside"
-    class="dropdown-trigger-backdrop"
-    @click="closeDropdown"
-  ></div>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -128,11 +130,11 @@ const searchTerm = ref('')
 
 const dropdownStyle = computed(() => {
   const style: any = {
-    position: 'absolute',
+    position: 'fixed',
     minWidth: '140px',
     maxWidth: '240px',
     width: props.width ? `${props.width}px` : 'auto',
-    zIndex: 2548
+    zIndex: 3000
   }
 
   if (!triggerRef.value) return style
@@ -140,43 +142,32 @@ const dropdownStyle = computed(() => {
   const viewportWidth = window.innerWidth
   const viewportHeight = window.innerHeight
   const triggerRect = triggerRef.value.getBoundingClientRect()
-  console.log('Trigger rect: ', JSON.stringify(triggerRect), JSON.stringify(triggerRef.value))
 
-  // dropdown
   const searchHeight = props.showSearch ? 32 : 0
   const footerHeight = 25
-  const dropdownTotalHeight = searchHeight + 240 + footerHeight // 240px
+  const dropdownTotalHeight = searchHeight + 240 + footerHeight
 
   const spaceAbove = triggerRect.top
   const spaceBelow = viewportHeight - triggerRect.bottom
 
   const showBelow = spaceBelow >= dropdownTotalHeight || spaceBelow > spaceAbove
 
-  // -
   if (showBelow) {
-    style.top = '100%'
-    style.marginTop = '4px'
+    style.top = `${triggerRect.bottom + 4}px`
   } else {
-    style.bottom = '100%'
-    style.top = 'auto'
-    style.marginBottom = '4px'
+    style.bottom = `${viewportHeight - triggerRect.top + 4}px`
   }
 
-  // dropdown
-  const dropdownWidth = props.width || 240 // props.width
-
-  // -
+  const dropdownWidth = props.width || 240
   const padding = 8
 
-  // align
   if (props.align === 'right') {
-    style.right = '0px'
+    style.right = `${viewportWidth - triggerRect.right}px`
     style.left = 'auto'
     return style
   }
 
   let leftPosition = 0
-
   switch (props.align) {
     case 'center':
       leftPosition = triggerRect.left + (triggerRect.width / 2) - (dropdownWidth / 2)
@@ -190,14 +181,11 @@ const dropdownStyle = computed(() => {
   if (leftPosition < padding) {
     leftPosition = padding
   }
-
-  console.log(leftPosition, dropdownWidth, viewportWidth, padding)
   if (leftPosition + dropdownWidth > viewportWidth - padding) {
     leftPosition = viewportWidth - dropdownWidth - padding
   }
 
-  const relativeLeft = leftPosition - triggerRect.left
-  style.left = `${relativeLeft}px`
+  style.left = `${leftPosition}px`
 
   return style
 })
@@ -351,7 +339,6 @@ defineExpose({
   flex-direction: column;
   gap: 2px;
   box-shadow: 0 0 8px 2px color-mix(in srgb, var(--vscode-widget-shadow) 30%, transparent);
-  contain: paint;
   outline: none;
   min-width: 140px;
   max-width: 240px;
@@ -374,7 +361,7 @@ defineExpose({
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 2547;
+  z-index: 2999;
   background: transparent;
 }
 

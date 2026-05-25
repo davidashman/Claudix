@@ -1100,7 +1100,7 @@
     bottom: 35px;
     left: 12px;
     right: 12px;
-    z-index: 25;
+    z-index: 2800;
     max-width: 1376px;
     margin: 0 auto;
     padding-top: 7px;

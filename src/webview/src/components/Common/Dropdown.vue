@@ -109,7 +109,7 @@ const selectedOption = computed(() => {
     min-width: 160px;
     max-width: 150px;
     padding-left: 0;
-    z-index: 1000;
+    z-index: 3000;
     list-style: none;
     padding: 0;
 }

@@ -1,6 +1,7 @@
 <template>
   <div ref="selectRef" class="custom-select" :class="{ open: isOpen }">
     <button
+      ref="buttonRef"
       class="select-button"
       @click="toggleDropdown"
       :class="{ active: isOpen }"
@@ -9,24 +10,27 @@
       <span class="codicon codicon-chevron-down select-icon" :class="{ rotated: isOpen }"></span>
     </button>
 
-    <Motion
-      v-if="isOpen"
-      class="select-dropdown"
-      :initial="{ opacity: 0, scale: 0.95, y: -10 }"
-      :animate="{ opacity: 1, scale: 1, y: 0 }"
-      :exit="{ opacity: 0, scale: 0.95, y: -10 }"
-      :transition="{ duration: 0.15, ease: 'easeOut' }"
-    >
-      <div
-        v-for="option in options"
-        :key="option.value"
-        class="select-option"
-        :class="{ selected: option.value === modelValue }"
-        @click="selectOption(option)"
+    <Teleport to="body">
+      <Motion
+        v-if="isOpen"
+        class="select-dropdown"
+        :style="dropdownStyle"
+        :initial="{ opacity: 0, scale: 0.95, y: -10 }"
+        :animate="{ opacity: 1, scale: 1, y: 0 }"
+        :exit="{ opacity: 0, scale: 0.95, y: -10 }"
+        :transition="{ duration: 0.15, ease: 'easeOut' }"
       >
-        {{ option.label }}
-      </div>
-    </Motion>
+        <div
+          v-for="option in options"
+          :key="option.value"
+          class="select-option"
+          :class="{ selected: option.value === modelValue }"
+          @click="selectOption(option)"
+        >
+          {{ option.label }}
+        </div>
+      </Motion>
+    </Teleport>
   </div>
 </template>
 
@@ -58,10 +62,23 @@ const emit = defineEmits<Emits>();
 
 const isOpen = ref(false);
 const selectRef = ref<HTMLElement | null>(null);
+const buttonRef = ref<HTMLElement | null>(null);
 
 const selectedLabel = computed(() => {
   const selected = props.options.find(option => option.value === props.modelValue);
   return selected?.label || props.placeholder;
+});
+
+const dropdownStyle = computed(() => {
+  if (!buttonRef.value) return {};
+  const rect = buttonRef.value.getBoundingClientRect();
+  return {
+    position: 'fixed' as const,
+    top: `${rect.bottom + 2}px`,
+    left: `${rect.left}px`,
+    minWidth: `${rect.width}px`,
+    zIndex: 3000,
+  };
 });
 
 const toggleDropdown = () => {
@@ -141,18 +158,12 @@ onUnmounted(() => {
 }
 
 .select-dropdown {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  z-index: 1000;
   background: var(--vscode-dropdown-background);
   border: 1px solid var(--vscode-dropdown-border);
   border-radius: 4px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   max-height: 200px;
   overflow-y: auto;
-  margin-top: 2px;
 }
 
 .select-option {
