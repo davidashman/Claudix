@@ -94,20 +94,22 @@
         </div>
 
         <div v-if="pendingPermission && toolContext" class="modal-in-input">
-          <AskUserQuestionModal
-            v-if="pendingPermission.toolName === 'AskUserQuestion'"
-            :request="pendingPermission"
-            :context="toolContext"
-            :on-resolve="handleResolvePermission"
-            data-permission-panel="1"
-          />
-          <PermissionRequestModal
-            v-else
-            :request="pendingPermission"
-            :context="toolContext"
-            :on-resolve="handleResolvePermission"
-            data-permission-panel="1"
-          />
+          <div class="modal-in-input-content">
+            <AskUserQuestionModal
+              v-if="pendingPermission.toolName === 'AskUserQuestion'"
+              :request="pendingPermission"
+              :context="toolContext"
+              :on-resolve="handleResolvePermission"
+              data-permission-panel="1"
+            />
+            <PermissionRequestModal
+              v-else
+              :request="pendingPermission"
+              :context="toolContext"
+              :on-resolve="handleResolvePermission"
+              data-permission-panel="1"
+            />
+          </div>
         </div>
 
         <div class="inputContainer">
@@ -481,10 +483,11 @@
     hasContentAbove.value = container.scrollTop > 0;
 
     // Show the history line only once the first chat-section has fully scrolled off the top.
+    // Use integer offsetTop/offsetHeight vs scrollTop to avoid floating-point failures on exact-equality (2-prompt case).
     const firstSection = container.querySelector<HTMLElement>('.chat-section');
     if (firstSection) {
-      const containerTop = container.getBoundingClientRect().top;
-      firstSectionScrolledOff.value = firstSection.getBoundingClientRect().bottom <= containerTop;
+      const sectionBottom = firstSection.offsetTop + firstSection.offsetHeight - 5;
+      firstSectionScrolledOff.value = container.scrollTop >= sectionBottom;
     } else {
       firstSectionScrolledOff.value = false;
     }
@@ -1098,13 +1101,16 @@
   .modal-in-input {
     position: absolute;
     bottom: 35px;
-    left: 12px;
-    right: 12px;
+    left: 0;
+    right: 0;
     z-index: 2800;
+    background-color: var(--vscode-panel-background);
+  }
+
+  .modal-in-input-content {
     max-width: 1376px;
     margin: 0 auto;
-    padding-top: 7px;
-    padding-bottom: 1px;
+    padding: 7px 12px 1px;
     background: linear-gradient(
       to bottom,
       transparent 0%,
@@ -1119,7 +1125,7 @@
   }
 
   .input-hidden :deep(.full-input-box) {
-    display: none;
+    visibility: hidden;
   }
 
 

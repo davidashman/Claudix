@@ -299,6 +299,7 @@ export class ClaudeAgentService implements IClaudeAgentService {
         this.logService.info('[ClaudeAgentService] readFromClient loop started');
         try {
             for await (const message of this.fromClientStream) {
+              try {
                 switch (message.type) {
                     case "launch_claude":
                         this.logService.info(`[ClaudeAgentService] launch_claude received: channel=${message.channelId} resume=${message.resume ?? 'null'}`);
@@ -391,6 +392,9 @@ export class ClaudeAgentService implements IClaudeAgentService {
                     default:
                         this.logService.error(`Unknown message type: ${(message as { type: string }).type}`);
                 }
+              } catch (msgError) {
+                this.logService.error(`[ClaudeAgentService] error handling message type=${message.type}: ${msgError}`);
+              }
             }
         } catch (error) {
             this.logService.error(`[ClaudeAgentService] readFromClient loop TERMINATED unexpectedly: ${error}`);
@@ -701,7 +705,8 @@ export class ClaudeAgentService implements IClaudeAgentService {
     ): void {
         const channel = this.channels.get(channelId);
         if (!channel) {
-            throw new Error(`Channel not found: ${channelId}`);
+            this.logService.warn(`[ClaudeAgentService] transportMessage: channel not found (already closed?): ${channelId}`);
+            return;
         }
 
         if (message.type === "user") {
