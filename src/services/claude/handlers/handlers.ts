@@ -1091,7 +1091,7 @@ export async function handleGetAgentDefinition(
 
 export async function handleListAgents(
     _request: ListAgentsRequest,
-    _context: HandlerContext
+    context: HandlerContext
 ): Promise<ListAgentsResponse> {
     const homeDir = os.homedir();
     const claudeDir = path.join(homeDir, '.claude');
@@ -1101,6 +1101,12 @@ export async function handleListAgents(
 
     // Walk ~/.claude/agents/ directly
     walkAllAgents(path.join(claudeDir, 'agents'), agents, seen);
+
+    // Walk .claude/agents/ in the current workspace
+    const workspaceFolder = context.workspaceService.getDefaultWorkspaceFolder();
+    if (workspaceFolder) {
+        walkAllAgents(path.join(workspaceFolder.uri.fsPath, '.claude', 'agents'), agents, seen);
+    }
 
     // Walk plugin cache: find plugin.json files, read their agents arrays
     const cacheDir = path.join(claudeDir, 'plugins', 'cache');
