@@ -195,16 +195,16 @@ function handleContentScroll() {
 }
 
 .markdown-content {
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1.6;
   color: var(--vscode-editor-foreground);
   word-wrap: break-word;
 }
 
 .markdown-content :deep(p) { margin: 8px 0; }
-.markdown-content :deep(h1) { font-size: 18px; font-weight: 600; margin: 16px 0 8px; }
-.markdown-content :deep(h2) { font-size: 16px; font-weight: 600; margin: 16px 0 8px; }
-.markdown-content :deep(h3) { font-size: 14px; font-weight: 600; margin: 16px 0 8px; }
+.markdown-content :deep(h1) { font-size: 15px; font-weight: 600; margin: 16px 0 8px; }
+.markdown-content :deep(h2) { font-size: 13px; font-weight: 600; margin: 16px 0 8px; }
+.markdown-content :deep(h3) { font-size: 12px; font-weight: 600; margin: 16px 0 8px; }
 .markdown-content :deep(h4),
 .markdown-content :deep(h5),
 .markdown-content :deep(h6) { font-weight: 600; margin: 12px 0 6px; }

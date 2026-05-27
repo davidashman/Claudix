@@ -259,7 +259,8 @@ class ProcessQuery implements Query {
     // Methods used by loadConfig() in handlers.ts via (query as any).xxx?.()
     async supportedCommands(): Promise<unknown[]> {
         const init = await this.waitForInit();
-        return (init?.tools as unknown[]) ?? [];
+        const commands = (init?.slash_commands as unknown[]) ?? [];
+        return commands.map(cmd => typeof cmd === 'string' ? { name: cmd } : cmd);
     }
 
     async supportedModels(): Promise<unknown[]> {

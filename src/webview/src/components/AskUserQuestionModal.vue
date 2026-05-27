@@ -159,10 +159,14 @@ function advanceOrSubmit() {
 
 function submitAnswers() {
   const answers: Record<string, string | string[]> = {};
+  console.log('[AskUserQuestion] submitAnswers: questions=', JSON.stringify(questions.value));
+  console.log('[AskUserQuestion] submitAnswers: selectedAnswers=', JSON.stringify(selectedAnswers.value));
   questions.value.forEach((question, index) => {
     const selected = selectedAnswers.value[index] || [];
-    answers[question.header] = question.multiSelect ? selected : (selected[0] || '');
+    answers[question.question] = question.multiSelect ? selected : (selected[0] || '');
   });
+  console.log('[AskUserQuestion] submitAnswers: final answers=', JSON.stringify(answers));
+  console.log('[AskUserQuestion] submitAnswers: updatedInput=', JSON.stringify({ ...props.request.inputs, answers }));
 
   props.request.accept({
     ...props.request.inputs,

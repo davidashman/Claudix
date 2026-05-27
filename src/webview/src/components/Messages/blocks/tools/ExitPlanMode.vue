@@ -49,14 +49,14 @@ const renderedPlan = computed(() => {
 
 .plan-content {
   font-family: var(--vscode-editor-font-family);
-  font-size: 1em;
+  font-size: 0.85em;
   line-height: 1.6;
   color: var(--vscode-editor-foreground);
   padding: 4px 0;
 }
 
 .plan-content :deep(h1) {
-  font-size: 1.4em;
+  font-size: 1.1em;
   font-weight: 600;
   margin-bottom: 12px;
   margin-top: 16px;
@@ -68,7 +68,7 @@ const renderedPlan = computed(() => {
 }
 
 .plan-content :deep(h2) {
-  font-size: 1.2em;
+  font-size: 1.0em;
   font-weight: 600;
   margin-bottom: 10px;
   margin-top: 16px;
@@ -76,7 +76,7 @@ const renderedPlan = computed(() => {
 }
 
 .plan-content :deep(h3) {
-  font-size: 1.1em;
+  font-size: 0.95em;
   font-weight: 600;
   margin-bottom: 8px;
   margin-top: 12px;
