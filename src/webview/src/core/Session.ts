@@ -647,7 +647,7 @@ export class Session {
       this.effortLevel()
     );
 
-    void this.readMessages(stream);
+    void this.readMessages(stream, channelId);
     return channelId;
   }
 
@@ -718,7 +718,14 @@ export class Session {
     if (!channelId) {
       return;
     }
+    // Clear the channel ID immediately so any subsequent launchClaude() call
+    // creates a fresh channel rather than reusing this one. The process may
+    // take time to exit (or never exit), so we can't wait for close_channel.
+    this.claudeChannelId(undefined);
     const connection = await this.getConnection();
+    // Terminate the local stream right away so readMessages unblocks even if
+    // the backend process is slow or stuck after receiving SIGINT.
+    connection.closeStream(channelId);
     connection.interruptClaude(channelId);
     // The SDK may not emit a `result` for interrupted turns. Clear the
     // counter and drop any queued work now so the UI recovers immediately
@@ -860,7 +867,7 @@ export class Session {
     }
   }
 
-  private async readMessages(stream: AsyncIterable<any>): Promise<void> {
+  private async readMessages(stream: AsyncIterable<any>, channelId: string): Promise<void> {
     try {
       for await (const event of stream) {
         this.processIncomingMessage(event);
@@ -873,7 +880,12 @@ export class Session {
       this.resetOutstandingTurns();
       this.hasActiveTool(false);
       this.streamingText(undefined);
-      this.claudeChannelId(undefined);
+      // Only clear the channel ID if it still belongs to this loop. An
+      // interrupt() call may have already cleared it (or set it to a new
+      // channel), in which case we must not overwrite the new value.
+      if (this.claudeChannelId() === channelId) {
+        this.claudeChannelId(undefined);
+      }
       // Drain any queued messages now that this channel's messages[] are fully
       // settled. For normal turn completions, `result` already drained the
       // queue (leaving it empty here). For interrupted turns that never emit

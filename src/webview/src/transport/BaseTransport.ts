@@ -168,6 +168,14 @@ export abstract class BaseTransport {
     this.send({ type: "interrupt_claude", channelId });
   }
 
+  closeStream(channelId: string): void {
+    const stream = this.streams.get(channelId);
+    if (stream) {
+      stream.done();
+      this.streams.delete(channelId);
+    }
+  }
+
   openFile(filePath: string, location?: any): Promise<any> {
     return this.sendRequest({ type: "open_file", filePath, location });
   }

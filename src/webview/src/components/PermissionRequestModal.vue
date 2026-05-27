@@ -59,8 +59,8 @@ interface Props {
 const props = defineProps<Props>();
 
 const isPlanMode = computed(() => props.request.toolName === 'ExitPlanMode');
-provide('toolForceCollapsed', !isPlanMode.value);
-provide('toolForceExpanded', isPlanMode.value);
+provide('toolForceCollapsed', false);
+provide('toolForceExpanded', true);
 provide('toolHideStatusIndicator', true);
 
 const containerRef = ref<HTMLDivElement | null>(null);
@@ -174,6 +174,8 @@ useKeybinding([
 
 .tool-preview {
   margin: 0 -4px;
+  max-height: 160px;
+  overflow-y: auto;
 }
 
 .permission-header {
@@ -273,6 +275,7 @@ useKeybinding([
 
 .plan-modal .tool-preview {
   flex: 1;
+  max-height: none;
   overflow-y: auto;
   min-height: 0;
 }
