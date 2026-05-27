@@ -817,9 +817,15 @@ export class Session {
     } catch (error) {
       this.error(error instanceof Error ? error.message : String(error));
     } finally {
-      // Stream ended (cleanly or via error): any turns that never produced
-      // a `result` are orphaned. Reset unconditionally so the UI recovers.
-      this.resetOutstandingTurns();
+      // Reset outstanding turns only if no newer channel has taken over.
+      // If interrupt() cleared the channel and the user immediately sent a
+      // new message, that new turn already incremented outstandingTurns.
+      // Resetting unconditionally here would corrupt the new turn's counter
+      // and leave the UI stuck thinking Claude is idle when it is not.
+      const activeChannel = this.claudeChannelId();
+      if (activeChannel === undefined || activeChannel === channelId) {
+        this.resetOutstandingTurns();
+      }
       this.hasActiveTool(false);
       this.streamingText(undefined);
       // Only clear the channel ID if it still belongs to this loop. An

@@ -222,6 +222,13 @@ class ProcessQuery implements Query {
         if (!this.proc.killed) {
             this.proc.kill('SIGINT');
         }
+        // Destroy stdin so the CLI sees EOF and exits after handling the
+        // interrupt, rather than lingering indefinitely waiting for more input.
+        // writeStdin() checks proc.stdin.destroyed before every write, so
+        // any in-flight drain-loop messages are silently dropped — safe.
+        if (this.proc.stdin && !this.proc.stdin.destroyed) {
+            this.proc.stdin.destroy();
+        }
     }
 
     async setPermissionMode(mode: PermissionMode): Promise<void> {
@@ -424,7 +431,7 @@ export class ClaudeSdkService implements IClaudeSdkService {
             '--input-format', 'stream-json',
             '--model', modelParam,
             '--permission-mode', permissionMode as string,
-            '--setting-sources=',
+            '--setting-sources=user,project,local',
             '--settings', relayPath,
             '--debug-to-stderr',
             '--include-partial-messages',

@@ -824,6 +824,60 @@ export async function handleOpenClaudeInTerminal(
 // ============================================================================
 // ============================================================================
 
+interface CustomCommand {
+    name: string;
+    description?: string;
+}
+
+function parseCommandFile(filePath: string): CustomCommand | null {
+    let content: string;
+    try { content = fs.readFileSync(filePath, 'utf-8'); } catch { return null; }
+    const name = path.basename(filePath, '.md');
+    if (!name) return null;
+    const match = content.match(/^---\n([\s\S]*?)\n---/);
+    let description: string | undefined;
+    if (match) {
+        const m = match[1].match(/^description:\s*["']?(.*?)["']?\s*$/m);
+        if (m) description = m[1].trim();
+    }
+    return { name, description };
+}
+
+function walkCommandsDir(dir: string, prefix: string, results: CustomCommand[], seen: Set<string>): void {
+    let entries: fs.Dirent[];
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    for (const entry of entries) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+            walkCommandsDir(full, prefix ? `${prefix}:${entry.name}` : entry.name, results, seen);
+        } else if (entry.isFile() && entry.name.endsWith('.md')) {
+            const cmd = parseCommandFile(full);
+            if (!cmd) continue;
+            const name = prefix ? `${prefix}:${cmd.name}` : cmd.name;
+            if (!seen.has(name)) {
+                seen.add(name);
+                results.push({ ...cmd, name });
+            }
+        }
+    }
+}
+
+function listCustomCommands(workspaceFolderPath?: string): CustomCommand[] {
+    const claudeDir = path.join(os.homedir(), '.claude');
+    const commands: CustomCommand[] = [];
+    const seen = new Set<string>();
+
+    walkCommandsDir(path.join(claudeDir, 'commands'), '', commands, seen);
+    walkCommandsDir(path.join(claudeDir, 'skills'), '', commands, seen);
+
+    if (workspaceFolderPath) {
+        walkCommandsDir(path.join(workspaceFolderPath, '.claude', 'commands'), '', commands, seen);
+        walkCommandsDir(path.join(workspaceFolderPath, '.claude', 'skills'), '', commands, seen);
+    }
+
+    return commands;
+}
+
 /**
  */
 async function loadConfig(context: HandlerContext): Promise<any> {
@@ -832,7 +886,8 @@ async function loadConfig(context: HandlerContext): Promise<any> {
     logService.info("Loading config cache by launching Claude...");
 
     const inputStream = new AsyncStream<SDKUserMessage>();
-    const cwd = workspaceService.getDefaultWorkspaceFolder()?.uri.fsPath || process.cwd();
+    const workspaceFolder = workspaceService.getDefaultWorkspaceFolder();
+    const cwd = workspaceFolder?.uri.fsPath || process.cwd();
 
     const query = await sdkService.query({
         inputStream,
@@ -848,13 +903,17 @@ async function loadConfig(context: HandlerContext): Promise<any> {
 
     inputStream.done();
 
-    const [slashCommands, models, accountInfo] = await Promise.all([
+    const [sdkCommands, models, accountInfo] = await Promise.all([
         (query as any).supportedCommands?.() ?? [],
         (query as any).supportedModels?.() ?? [],
         (query as any).accountInfo?.() ?? null,
     ]);
 
-    const config = { slashCommands, models, accountInfo };
+    const customCommands = listCustomCommands(workspaceFolder?.uri.fsPath);
+    const sdkCommandNames = new Set((sdkCommands as any[]).map((c: any) => c?.name).filter(Boolean));
+    const merged = [...sdkCommands, ...customCommands.filter(c => !sdkCommandNames.has(c.name))];
+
+    const config = { slashCommands: merged, models, accountInfo };
 
     logService.info(`  - Config: [${JSON.stringify(config)}]`);
     await query.return?.();
