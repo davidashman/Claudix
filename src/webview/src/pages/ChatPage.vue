@@ -94,22 +94,20 @@
         </div>
 
         <div v-if="pendingPermission && toolContext" class="modal-in-input">
-          <div class="modal-in-input-content">
-            <AskUserQuestionModal
-              v-if="pendingPermission.toolName === 'AskUserQuestion'"
-              :request="pendingPermission"
-              :context="toolContext"
-              :on-resolve="handleResolvePermission"
-              data-permission-panel="1"
-            />
-            <PermissionRequestModal
-              v-else
-              :request="pendingPermission"
-              :context="toolContext"
-              :on-resolve="handleResolvePermission"
-              data-permission-panel="1"
-            />
-          </div>
+          <AskUserQuestionModal
+            v-if="pendingPermission.toolName === 'AskUserQuestion'"
+            :request="pendingPermission"
+            :context="toolContext"
+            :on-resolve="handleResolvePermission"
+            data-permission-panel="1"
+          />
+          <PermissionRequestModal
+            v-else
+            :request="pendingPermission"
+            :context="toolContext"
+            :on-resolve="handleResolvePermission"
+            data-permission-panel="1"
+          />
         </div>
 
         <div class="inputContainer">
@@ -1101,16 +1099,13 @@
   .modal-in-input {
     position: absolute;
     bottom: 35px;
-    left: 0;
-    right: 0;
+    left: 12px;
+    right: 12px;
     z-index: 2800;
-    background-color: var(--vscode-panel-background);
-  }
-
-  .modal-in-input-content {
     max-width: 1376px;
     margin: 0 auto;
-    padding: 7px 12px 1px;
+    padding-top: 7px;
+    padding-bottom: 1px;
     background: linear-gradient(
       to bottom,
       transparent 0%,

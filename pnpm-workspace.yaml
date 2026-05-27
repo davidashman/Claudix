@@ -1,0 +1,6 @@
+allowBuilds:
+  '@vscode/vsce-sign': true
+  esbuild: true
+  keytar: true
+  node-pty: true
+  vue-demi: true
