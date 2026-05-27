@@ -63,9 +63,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, nextTick } from 'vue';
 import type { PermissionRequest } from '../core/PermissionRequest';
 import type { ToolContext } from '../types/tool';
+import { useKeybinding } from '../utils/useKeybinding';
 
 interface QuestionOption {
   label: string;
@@ -93,7 +94,7 @@ const selectedAnswers = ref<Record<number, string[]>>({});
 
 onMounted(() => {
   if (document.hasFocus()) {
-    containerRef.value?.focus();
+    nextTick(() => containerRef.value?.focus());
   }
 });
 
@@ -192,11 +193,15 @@ function handleKeyDown(e: KeyboardEvent) {
   } else if (e.key === 'ArrowLeft' && currentQuestionIndex.value > 0) {
     e.preventDefault();
     goBack();
-  } else if (e.key === 'Escape') {
-    e.preventDefault();
-    handleCancel();
   }
 }
+
+useKeybinding({
+  keys: 'escape',
+  priority: 200,
+  allowInEditable: true,
+  handler: handleCancel,
+});
 </script>
 
 <style scoped>

@@ -146,7 +146,7 @@ class ProcessQuery implements Query {
                 handler.resolve(response);
             }
         } else if (type === 'keep_alive') {
-            // nothing
+            this.logService.info(`  ⏳ keep_alive`);
         } else {
             // Capture the system init message for probe methods
             if (type === 'system' && (msg.subtype as string) === 'init' && !this.initResponse) {

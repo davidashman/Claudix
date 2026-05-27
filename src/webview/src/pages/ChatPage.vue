@@ -2,15 +2,7 @@
   <div class="chat-page">
     <div class="main">
       <!-- <div class="chatContainer"> -->
-        <TerminalView
-          v-if="isTerminalMode && activeSessionRaw && session?.connection.value"
-          ref="terminalViewRef"
-          :session="activeSessionRaw"
-          :connection="session!.connection.value!"
-          class="terminalContainer"
-        />
         <div
-          v-else
           ref="containerEl"
           :class="['messagesContainer', 'custom-scroll-container']"
           :style="containerHeight > 0 ? { '--thread-height': containerHeight + 'px' } : {}"
@@ -111,7 +103,6 @@
         </div>
 
         <div class="inputContainer">
-          <template v-if="!terminalInputHidden">
             <MessageQueueList
               :queued-messages="outboundQueue"
               :visible="outboundQueue.length > 0"
@@ -132,7 +123,6 @@
               :permission-mode="session?.permissionMode.value"
               :selected-model="session?.modelSelection.value"
               :selected-agent="session?.agentSelection.value"
-              :hide-controls="isTerminalMode"
               @submit="handleSubmit"
               @stop="handleStop"
               @add-attachment="handleAddAttachment"
@@ -141,7 +131,6 @@
               @model-select="handleModelSelect"
               @effort-select="handleEffortSelect"
             />
-          </template>
         </div>
       <!-- </div> -->
     </div>
@@ -162,7 +151,6 @@
   import PermissionRequestModal from '../components/PermissionRequestModal.vue';
   import AskUserQuestionModal from '../components/AskUserQuestionModal.vue';
   import RelayIcon from '@/components/RelayIcon.vue';
-  import TerminalView from '../components/TerminalView.vue';
   import MessageRenderer from '../components/Messages/MessageRenderer.vue';
   import StreamingMessage from '../components/Messages/StreamingMessage.vue';
   import UserMessage from '../components/Messages/UserMessage.vue';
@@ -174,9 +162,6 @@
   import { useSignal } from '@gn8/alien-signals-vue';
   import type { PermissionMode } from '@anthropic-ai/claude-agent-sdk';
   import { prepareSendAnimation, captureQueueItemSnapshot, type SendSnapshot } from '../composables/useSendAnimation';
-
-  const isTerminalMode = (window as any).RELAY_BOOTSTRAP?.terminalMode === true;
-  const terminalInputHidden = isTerminalMode && (window as any).RELAY_BOOTSTRAP?.terminalInputHidden === true;
 
   const runtime = inject(RuntimeKey);
   if (!runtime) throw new Error('[ChatPage] runtime not provided');
@@ -408,7 +393,6 @@
   const containerEl = ref<HTMLDivElement | null>(null);
   const endEl = ref<HTMLDivElement | null>(null);
   const chatInputRef = ref<InstanceType<typeof ChatInputBox> | null>(null);
-  const terminalViewRef = ref<InstanceType<typeof TerminalView> | null>(null);
   let unsubPanelFocus: (() => void) | undefined;
   const containerHeight = ref(0);
   let resizeObserver: ResizeObserver | null = null;
@@ -585,19 +569,31 @@
   });
 
   function focusActiveInput() {
-    if (isTerminalMode) {
-      terminalViewRef.value?.focus();
-    } else if (!pendingPermission.value) {
+    if (!pendingPermission.value) {
       chatInputRef.value?.focus();
     }
   }
 
+  function focusPermissionPanel() {
+    const el = document.querySelector<HTMLElement>('[data-permission-panel="1"]');
+    el?.focus();
+  }
+
   function handleWindowFocus() {
-    if (!pendingPermission.value) focusActiveInput();
+    if (pendingPermission.value) {
+      focusPermissionPanel();
+    } else {
+      focusActiveInput();
+    }
   }
 
   function handleVisibilityChange() {
-    if (document.visibilityState === 'visible' && !pendingPermission.value) focusActiveInput();
+    if (document.visibilityState !== 'visible') return;
+    if (pendingPermission.value) {
+      focusPermissionPanel();
+    } else {
+      focusActiveInput();
+    }
   }
 
   function handleEditCancelled() {
@@ -636,7 +632,11 @@
 
     const conn = await runtime.connectionManager.get();
     unsubPanelFocus = conn.panelFocusedEvents.add(() => {
-      if (!pendingPermission.value) focusActiveInput();
+      if (pendingPermission.value) {
+        focusPermissionPanel();
+      } else {
+        focusActiveInput();
+      }
     });
   });
 
@@ -666,12 +666,6 @@
     // Handle built-in /clear command
     if (trimmed === '/clear') {
       await runtime!.tabs.replaceCurrentTab();
-      return;
-    }
-
-    // In terminal mode, forward input directly to the PTY
-    if (isTerminalMode) {
-      if (trimmed) activeSessionRaw.value?.sendPtyInput(trimmed + '\r');
       return;
     }
 
@@ -763,23 +757,6 @@
 
 
   async function handleModeSelect(mode: PermissionMode) {
-    if (isTerminalMode) {
-      const rawSession = activeSessionRaw.value;
-      if (rawSession) {
-        const order: PermissionMode[] = ['default', 'acceptEdits', 'plan', 'auto'];
-        const cur = rawSession.permissionMode() ?? 'default';
-        const curIdx = Math.max(0, order.indexOf(cur));
-        const targetIdx = order.indexOf(mode);
-        if (targetIdx >= 0) {
-          const steps = (targetIdx - curIdx + order.length) % order.length;
-          for (let i = 0; i < steps; i++) {
-            rawSession.sendPtyInput('\x1b[Z');
-          }
-          rawSession.permissionMode(mode);
-        }
-      }
-      return;
-    }
     const s = session.value;
     if (!s) return;
 
@@ -811,29 +788,14 @@
     }
   );
 
-  // shift+tab → permissionMode.toggle (or forward to PTY in terminal mode)
   useKeybinding({
     keys: 'shift+tab',
-    handler: () => {
-      if (isTerminalMode) {
-        activeSessionRaw.value?.sendPtyInput('\x1b[Z');
-      } else {
-        togglePermissionMode();
-      }
-    },
+    handler: () => { togglePermissionMode(); },
     allowInEditable: true,
     priority: 100,
   });
 
   async function handleModelSelect(modelId: string) {
-    if (isTerminalMode) {
-      const rawSession = activeSessionRaw.value;
-      if (rawSession) {
-        rawSession.sendPtyInput(`/model ${modelId}\r`);
-        rawSession.modelSelection(modelId);
-      }
-      return;
-    }
     const s = session.value;
     if (!s) return;
 
@@ -842,14 +804,6 @@
   }
 
   async function handleEffortSelect(level: string | undefined) {
-    if (isTerminalMode) {
-      const rawSession = activeSessionRaw.value;
-      if (rawSession) {
-        if (level) rawSession.sendPtyInput(`/effort ${level}\r`);
-        rawSession.effortLevel(level);
-      }
-      return;
-    }
     const s = session.value;
     if (!s) return;
 
@@ -895,31 +849,6 @@
 
   async function handleAddAttachment(files: FileList) {
     if (!files || files.length === 0) return;
-
-    if (isTerminalMode) {
-      // Stage files to disk and inject @path references into the input
-      try {
-        const connection = await runtime.connectionManager.get();
-        for (const file of Array.from(files)) {
-          const data = await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => {
-              const result = reader.result as string;
-              // Strip the data:...;base64, prefix
-              resolve(result.split(',')[1] ?? '');
-            };
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
-          });
-          const { filePath } = await connection.stageFile(file.name, data);
-          chatInputRef.value?.appendText(`@${filePath}`);
-        }
-      } catch (e) {
-        console.error('[ChatPage] Failed to stage file for terminal:', e);
-      }
-      chatInputRef.value?.focus();
-      return;
-    }
 
     try {
       // AttachmentItem
@@ -984,14 +913,6 @@
     display: flex;
     flex-direction: column;
   }
-  .terminalContainer {
-    flex: 1;
-    min-height: 0;
-    max-width: 1380px;
-    width: 100%;
-    align-self: center;
-  }
-
   .messagesContainer {
     flex: 1;
     overflow-y: auto;

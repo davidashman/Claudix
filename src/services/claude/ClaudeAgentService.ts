@@ -28,8 +28,6 @@ import { ITerminalService } from '../terminalService';
 import { ITabsAndEditorsService } from '../tabsAndEditorsService';
 import { IClaudeSdkService, type SdkQueryParams } from './ClaudeSdkService';
 import { IClaudeSessionService } from './ClaudeSessionService';
-import { IClaudeTerminalService } from './ClaudeTerminalService';
-import { RelayMcpServer } from './RelayMcpServer';
 import { AsyncStream, ITransport } from './transport';
 import { HandlerContext } from './handlers/types';
 import { IWebViewService } from '../webViewService';
@@ -203,13 +201,6 @@ export class ClaudeAgentService implements IClaudeAgentService {
 
     private fromClientStream = new AsyncStream<WebViewToExtensionMessage>();
 
-    // PTY channel → webviewId + cwd, for directing session-id updates
-    private readonly _ptyMeta = new Map<string, { webviewId: string; cwd: string }>();
-    // cwd → active FSWatcher (one per unique cwd)
-    private readonly _cwdWatchers = new Map<string, fs.FSWatcher>();
-    // cwd → reference count (number of active PTY channels for that cwd)
-    private readonly _cwdRefCounts = new Map<string, number>();
-
     private outstandingRequests = new Map<string, RequestHandler>();
 
     private abortControllers = new Map<string, AbortController>();
@@ -223,10 +214,6 @@ export class ClaudeAgentService implements IClaudeAgentService {
     // Effort Level Opus 4.6+ adaptive reasoning
     private effortLevel: string | null = null;
 
-    // HTTP MCP server for terminal-mode PTY permission prompts
-    private permissionServer: RelayMcpServer | null = null;
-    private permissionServerStarting: Promise<void> | null = null;
-
     constructor(
         @ILogService private readonly logService: ILogService,
         @IConfigurationService private readonly configService: IConfigurationService,
@@ -237,7 +224,6 @@ export class ClaudeAgentService implements IClaudeAgentService {
         @ITabsAndEditorsService private readonly tabsAndEditorsService: ITabsAndEditorsService,
         @IClaudeSdkService private readonly sdkService: IClaudeSdkService,
         @IClaudeSessionService private readonly sessionService: IClaudeSessionService,
-        @IClaudeTerminalService private readonly claudeTerminalService: IClaudeTerminalService,
         @IWebViewService private readonly webViewService: IWebViewService
     ) {
         //  Handler
@@ -255,15 +241,6 @@ export class ClaudeAgentService implements IClaudeAgentService {
             webViewService: this.webViewService,
         };
 
-        // Wire PTY I/O callbacks
-        this.claudeTerminalService.onData((channelId, data) => {
-            this.transport?.send({ type: 'pty_data', channelId, data });
-        });
-        this.claudeTerminalService.onExit((channelId, exitCode) => {
-            this.transport?.send({ type: 'pty_exit', channelId, exitCode });
-            this._stopProjectDirWatch(channelId);
-            this.permissionServer?.cleanupChannel(channelId).catch(() => {});
-        });
     }
 
     /**
@@ -339,50 +316,6 @@ export class ClaudeAgentService implements IClaudeAgentService {
 
                     case "response":
                         this.handleResponse(message);
-                        break;
-
-                    case "launch_pty": {
-                        const ptyCwd = message.cwd || this.getCwd();
-                        void (async () => {
-                            let mcpConfigPath: string | undefined;
-                            try {
-                                const server = await this.ensurePermissionServer();
-                                mcpConfigPath = await server.writeMcpConfig(message.channelId);
-                                this.logService.info(`[ClaudeAgentService] MCP config written: ${mcpConfigPath}`);
-                            } catch (err) {
-                                this.logService.warn(`[ClaudeAgentService] MCP server unavailable, falling back to CLI prompts: ${err}`);
-                            }
-                            this.logService.info(`[ClaudeAgentService] spawning PTY channel=${message.channelId} mcpConfigPath=${mcpConfigPath ?? 'none'}`);
-                            await this.claudeTerminalService.spawn({
-                                channelId: message.channelId,
-                                resume: message.resume,
-                                agent: message.agent,
-                                permissionMode: message.permissionMode,
-                                model: message.model,
-                                effortLevel: message.effortLevel,
-                                cwd: ptyCwd,
-                                cols: message.cols,
-                                rows: message.rows,
-                                mcpConfigPath,
-                            });
-                        })().catch(err => {
-                            this.logService.error(`[ClaudeAgentService] launch_pty error: ${err}`);
-                        });
-                        if (message.webviewId && ptyCwd) {
-                            void this._startProjectDirWatch(message.channelId, message.webviewId, ptyCwd);
-                        }
-                        break;
-                    }
-
-                    case "pty_input":
-                        this.claudeTerminalService.write(message.channelId, message.data);
-                        if (message.data.includes('\r')) {
-                            this.transport?.send({ type: 'pty_turn_start', channelId: message.channelId });
-                        }
-                        break;
-
-                    case "pty_resize":
-                        this.claudeTerminalService.resize(message.channelId, message.cols, message.rows);
                         break;
 
                     case "cancel_request":
@@ -525,10 +458,19 @@ export class ClaudeAgentService implements IClaudeAgentService {
                 try {
                     this.logService.info(`  →  Query ...`);
                     let messageCount = 0;
+                    const queryStart = Date.now();
+                    let lastMessageTime = queryStart;
 
                     for await (const message of query) {
                         messageCount++;
-                        this.logService.info(`  ←  #${messageCount}: ${message.type}`);
+                        const now = Date.now();
+                        const elapsed = ((now - queryStart) / 1000).toFixed(3);
+                        const gap = ((now - lastMessageTime) / 1000).toFixed(3);
+                        lastMessageTime = now;
+                        const detail = (message as any).type === 'stream_event'
+                            ? `stream_event/${(message as any).event?.type ?? '?'}${(message as any).event?.delta?.type ? `/${(message as any).event.delta.type}` : ''}`
+                            : (message as any).type;
+                        this.logService.info(`  ←  #${messageCount} [+${elapsed}s, gap:${gap}s]: ${detail}`);
 
                         // Inject _oldStart into Edit tool_use blocks so the webview
                         // can show correct line numbers in the diff regardless of permission mode.
@@ -558,7 +500,8 @@ export class ClaudeAgentService implements IClaudeAgentService {
                     }
 
                     // Normal completion
-                    this.logService.info(`  ✓ Query output completed, ${messageCount} messages total`);
+                    const totalElapsed = ((Date.now() - queryStart) / 1000).toFixed(3);
+                    this.logService.info(`  ✓ Query output completed, ${messageCount} messages total in ${totalElapsed}s`);
                     this.closeChannel(channelId, true);
                 } catch (error) {
                     // Error occurred
@@ -989,120 +932,8 @@ export class ClaudeAgentService implements IClaudeAgentService {
     async shutdown(): Promise<void> {
         await this.closeAllChannels();
         this.fromClientStream.done();
-        this.permissionServer?.dispose();
-        this.permissionServer = null;
     }
 
-    /**
-     * Lazily start the HTTP MCP permission server (shared across all PTY channels).
-     */
-    private async ensurePermissionServer(): Promise<RelayMcpServer> {
-        if (!this.permissionServer) {
-            this.logService.info('[ClaudeAgentService] starting RelayMcpServer');
-            this.permissionServer = new RelayMcpServer({
-                onPermission: (channelId, toolName, inputs) => {
-                    this.logService.info(`[ClaudeAgentService] permission request from MCP: channel=${channelId} tool=${toolName}`);
-                    return this.requestToolPermission(channelId, toolName, inputs, [], undefined);
-                },
-                onQuestion: async (channelId, inputs) => {
-                    this.logService.info(`[ClaudeAgentService] AskUserQuestion hook: channel=${channelId}`);
-                    const result = await this.requestToolPermission(channelId, 'AskUserQuestion', inputs, [], undefined);
-                    if (result.behavior === 'allow' && result.updatedInput) {
-                        return result.updatedInput as Record<string, unknown>;
-                    }
-                    throw new Error('AskUserQuestion denied');
-                },
-                onTurnDone: (channelId) => {
-                    this.logService.info(`[ClaudeAgentService] Turn done: channel=${channelId}`);
-                    this.transport?.send({ type: 'pty_turn_done', channelId });
-                },
-                onGetDiagnostics: async (uri?: string) => {
-                    const severityMap = ['error', 'warning', 'information', 'hint'] as const;
-                    if (uri) {
-                        const fileUri = vscode.Uri.file(uri);
-                        return vscode.languages.getDiagnostics(fileUri).map(d => ({
-                            uri,
-                            severity: severityMap[d.severity] ?? 'error',
-                            message: d.message,
-                            range: {
-                                startLine: d.range.start.line + 1,
-                                startColumn: d.range.start.character,
-                                endLine: d.range.end.line + 1,
-                                endColumn: d.range.end.character,
-                            },
-                            source: d.source,
-                            code: typeof d.code === 'object' ? String(d.code.value) : d.code,
-                        }));
-                    }
-                    return vscode.languages.getDiagnostics().flatMap(([fileUri, diagnostics]) =>
-                        diagnostics.map(d => ({
-                            uri: fileUri.fsPath,
-                            severity: severityMap[d.severity] ?? 'error',
-                            message: d.message,
-                            range: {
-                                startLine: d.range.start.line + 1,
-                                startColumn: d.range.start.character,
-                                endLine: d.range.end.line + 1,
-                                endColumn: d.range.end.character,
-                            },
-                            source: d.source,
-                            code: typeof d.code === 'object' ? String(d.code.value) : d.code,
-                        }))
-                    );
-                },
-                onOpenFile: async (filePath: string, startLine?: number, endLine?: number) => {
-                    const uri = vscode.Uri.file(filePath);
-                    const doc = await vscode.workspace.openTextDocument(uri);
-                    const editor = await vscode.window.showTextDocument(doc, { preview: false });
-                    if (startLine !== undefined) {
-                        const start = Math.max(startLine - 1, 0);
-                        const end = endLine !== undefined ? Math.max(endLine - 1, start) : start;
-                        const range = new vscode.Range(start, 0, end, 0);
-                        editor.revealRange(range, vscode.TextEditorRevealType.InCenter);
-                        editor.selection = new vscode.Selection(range.start, range.end);
-                    }
-                },
-                onGetCurrentSelection: async () => {
-                    const editor = vscode.window.activeTextEditor;
-                    if (!editor || editor.selection.isEmpty || editor.document.uri.scheme !== 'file') {
-                        return null;
-                    }
-                    const { document, selection } = editor;
-                    return {
-                        filePath: document.uri.fsPath,
-                        content: document.getText(selection),
-                        startLine: selection.start.line + 1,
-                        endLine: selection.end.line + 1,
-                        startColumn: selection.start.character,
-                        endColumn: selection.end.character,
-                    };
-                },
-                onShowDiff: async (filePath: string, newContent: string, description?: string) => {
-                    const tempPath = await this.fileSystemService.createTempFile(
-                        path.basename(filePath),
-                        newContent
-                    );
-                    const leftUri = vscode.Uri.file(filePath);
-                    const rightUri = vscode.Uri.file(tempPath);
-                    const title = description ?? `${path.basename(filePath)} (Claude)`;
-                    await vscode.commands.executeCommand('vscode.diff', leftUri, rightUri, title, { preview: true });
-                },
-                log: (msg) => this.logService.info(msg),
-            });
-            this.permissionServerStarting = this.permissionServer.start().then(() => {
-                this.logService.info(`[ClaudeAgentService] RelayMcpServer started on port ${this.permissionServer!.port}`);
-            }).catch(err => {
-                this.logService.error(`[ClaudeAgentService] RelayMcpServer start failed: ${err}`);
-                this.permissionServer = null;
-                this.permissionServerStarting = null;
-                throw err;
-            });
-        }
-        await this.permissionServerStarting;
-        return this.permissionServer!;
-    }
-
-    // ========================================================================
     // ========================================================================
 
     /**
@@ -1116,109 +947,6 @@ export class ClaudeAgentService implements IClaudeAgentService {
      */
     private getCwd(): string {
         return this.workspaceService.getDefaultWorkspaceFolder()?.uri.fsPath || process.cwd();
-    }
-
-    // ── Project directory watcher (for terminal PTY sessions) ─────────────────
-
-    private async _startProjectDirWatch(channelId: string, webviewId: string, cwd: string): Promise<void> {
-        this._ptyMeta.set(channelId, { webviewId, cwd });
-
-        const refCount = (this._cwdRefCounts.get(cwd) ?? 0) + 1;
-        this._cwdRefCounts.set(cwd, refCount);
-        if (refCount > 1) return; // watcher already running for this cwd
-
-        const configDir = (await this.configService.getConfigurationDirectory())
-            ?? process.env.CLAUDE_CONFIG_DIR
-            ?? path.join(os.homedir(), '.claude');
-        const projectDir = path.join(configDir, 'projects', cwd.replace(/[^a-zA-Z0-9]/g, '-'));
-
-        try {
-            await fsPromises.mkdir(projectDir, { recursive: true });
-        } catch { /* ignore */ }
-
-        const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.jsonl$/i;
-        const notifiedIds = new Set<string>();
-
-        const processFile = async (filename: string) => {
-            if (!UUID_RE.test(filename)) return;
-            const sessionId = filename.slice(0, -6);
-            const filePath = path.join(projectDir, filename);
-
-            let summary = '';
-            try {
-                const content = await fsPromises.readFile(filePath, 'utf8');
-                for (const line of content.split('\n')) {
-                    if (!line.trim()) continue;
-                    try {
-                        const msg = JSON.parse(line);
-                        if (msg.type !== 'user' || msg.isMeta) continue;
-                        const c = msg.message?.content;
-                        let text = typeof c === 'string' ? c
-                            : Array.isArray(c) ? (c.filter((b: any) => b?.type === 'text').pop()?.text ?? '') : '';
-                        text = text.trim();
-                        if (text && !text.startsWith('/')) {
-                            summary = text.length > 45 ? text.slice(0, 45) + '...' : text;
-                            break;
-                        }
-                    } catch { /* malformed line */ }
-                }
-            } catch { return; }
-
-            if (!summary) return;
-
-            // Notify all PTY channels watching this cwd; the webview side filters
-            // by channelId and drives the rename_tab roundtrip for the correct tab.
-            for (const [chId, meta] of this._ptyMeta.entries()) {
-                if (meta.cwd !== cwd) continue;
-                this.transport?.send({ type: 'pty_session_id', channelId: chId, sessionId, summary });
-            }
-
-            if (!notifiedIds.has(sessionId)) {
-                notifiedIds.add(sessionId);
-                // Broadcast to all webviews so sessions pages refresh
-                this.transport?.send({ type: 'sessions_changed' });
-            }
-        };
-
-        let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-
-        try {
-            const watcher = fs.watch(projectDir, (_, filename) => {
-                if (!filename) return;
-                if (debounceTimer) clearTimeout(debounceTimer);
-                debounceTimer = setTimeout(() => {
-                    debounceTimer = null;
-                    void processFile(filename);
-                }, 300);
-            });
-            watcher.on('error', (err) => {
-                this.logService.warn(`[ClaudeAgentService] dir watcher error cwd=${cwd}: ${err}`);
-            });
-            this._cwdWatchers.set(cwd, watcher);
-            this.logService.info(`[ClaudeAgentService] watching ${projectDir}`);
-        } catch (err) {
-            this.logService.warn(`[ClaudeAgentService] failed to watch ${projectDir}: ${err}`);
-        }
-    }
-
-    private _stopProjectDirWatch(channelId: string): void {
-        const meta = this._ptyMeta.get(channelId);
-        if (!meta) return;
-        this._ptyMeta.delete(channelId);
-
-        const { cwd } = meta;
-        const refCount = (this._cwdRefCounts.get(cwd) ?? 1) - 1;
-        if (refCount <= 0) {
-            this._cwdRefCounts.delete(cwd);
-            const watcher = this._cwdWatchers.get(cwd);
-            if (watcher) {
-                watcher.close();
-                this._cwdWatchers.delete(cwd);
-                this.logService.info(`[ClaudeAgentService] stopped watching cwd=${cwd}`);
-            }
-        } else {
-            this._cwdRefCounts.set(cwd, refCount);
-        }
     }
 
     private getThinkingConfig(level: string, model: string | null): ThinkingConfig {

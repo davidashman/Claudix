@@ -21,22 +21,6 @@
     "configuration": {
       "title": "Relay",
       "properties": {
-        "relay.defaultMode": {
-          "type": "string",
-          "enum": [
-            "panel",
-            "terminal",
-            "terminalWithInput"
-          ],
-          "default": "panel",
-          "enumItemLabels": [
-            "Chat Panel",
-            "Terminal",
-            "Terminal + Input"
-          ],
-          "description": "How new sessions are opened: in a Relay chat panel or a VSCode terminal running Claude Code.",
-          "order": 0
-        },
         "relay.defaultAgent": {
           "type": "string",
           "default": "",
@@ -285,8 +269,7 @@
     "lexical-vue": "^0.14.1",
     "marked": "^17.0.1",
     "motion-v": "^1.7.4",
-    "node-pty": "^1.1.0",
-    "path-browserify-esm": "^1.0.6",
+"path-browserify-esm": "^1.0.6",
     "pinia": "^3.0.4",
     "reka-ui": "^2.9.7",
     "vue": "^3.5.26"

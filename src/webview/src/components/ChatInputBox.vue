@@ -3,6 +3,7 @@
     <div
       class="full-input-box"
       :style="{ position: 'relative', '--mode-border-color': modeBorderColor }"
+      @mousedown="handleInputBoxMousedown"
     >
       <div v-if="attachments && attachments.length > 0" class="attachments-list">
         <Tooltip 
@@ -931,6 +932,13 @@ function navigateHistoryDown() {
     setHistoryContent(draftContent.value)
     draftContent.value = ''
   }
+}
+
+function handleInputBoxMousedown(event: MouseEvent) {
+  const target = event.target as Element
+  if (target.closest('button, [contenteditable="true"]')) return
+  event.preventDefault()
+  textareaRef.value?.focus()
 }
 
 function handleSubmit(interrupt: boolean = false) {

@@ -48,6 +48,9 @@ export interface SessionOptions {
   existingWorktree?: { name: string; path: string };
   resumeId?: string;
   initialAgent?: string;
+  initialModel?: string;
+  initialEffort?: string;
+  initialMode?: PermissionMode;
 }
 
 export interface SessionContext {
@@ -75,7 +78,6 @@ export interface SessionContext {
 
 export class Session {
   private readonly claudeChannelId = signal<string | undefined>(undefined);
-  private readonly ptyChannelId = signal<string | undefined>(undefined);
   private currentConnectionPromise?: Promise<BaseTransport>;
   private lastSentSelection?: SelectionRange;
   private effectCleanup?: () => void;
@@ -86,13 +88,6 @@ export class Session {
   // public sessionId (which drives persistence / window-restore) until the
   // first `result` proves the fork's JSONL was written to disk.
   private _sdkSessionId?: string;
-
-  // Incremented each time a pty_turn_start event arrives (Enter sent to PTY), capped at
-  // ptyTurnDone+1 so multiple Enter presses don't inflate the counter beyond one pending turn.
-  readonly ptyTurnStart = signal(0);
-  // Incremented each time a pty_turn_done event arrives for this session's PTY channel.
-  // Used by the panel badge effect to show green "done" icon after turn completion.
-  readonly ptyTurnDone = signal(0);
 
   // Context-compaction interception state. When the SDK streams a compacting
   // window, we buffer the summary assistant output here and surface it as a
@@ -179,14 +174,13 @@ export class Session {
   readonly permissionRequests = computed<PermissionRequest[]>(() => {
     const conn = this.connection();
     const channelId = this.claudeChannelId();
-    const ptyChannelId = this.ptyChannelId();
-    if (!conn || (!channelId && !ptyChannelId)) {
+    if (!conn || !channelId) {
       return [];
     }
 
     return conn
       .permissionRequests()
-      .filter((request) => request.channelId === channelId || request.channelId === ptyChannelId);
+      .filter((request) => request.channelId === channelId);
   });
 
   isOffline(): boolean {
@@ -229,6 +223,16 @@ export class Session {
 
     if (options.initialAgent) {
       this.agentSelection(options.initialAgent);
+    }
+    if (options.initialModel) {
+      this.modelSelection(options.initialModel);
+    }
+    if (options.initialEffort) {
+      this.effortLevel(options.initialEffort);
+    }
+    if (options.initialMode) {
+      this._permissionModeInitialized = true;
+      this.permissionMode(options.initialMode);
     }
 
     effect(() => {
@@ -315,7 +319,6 @@ export class Session {
       this.error(err instanceof Error ? err.message : String(err));
       return;
     }
-    if ((window as any).RELAY_BOOTSTRAP?.terminalMode) return;
     await this.launchClaude();
   }
 
@@ -574,10 +577,6 @@ export class Session {
   }
 
   async launchClaude(): Promise<string> {
-    if ((window as any).RELAY_BOOTSTRAP?.terminalMode) {
-      return this.ptyChannelId() ?? '';
-    }
-
     const existingChannel = this.claudeChannelId();
     if (existingChannel) {
       return existingChannel;
@@ -649,63 +648,6 @@ export class Session {
 
     void this.readMessages(stream, channelId);
     return channelId;
-  }
-
-  async launchPty(cols: number, rows: number): Promise<string> {
-    const existing = this.ptyChannelId();
-    if (existing) return existing;
-
-    const channelId = Math.random().toString(36).slice(2);
-    this.ptyChannelId(channelId);
-
-    const connection = await this.getConnection();
-    if (!this.cwd()) this.cwd(connection.config()?.defaultCwd);
-
-    const resumeId = this._sdkSessionId ?? this.sessionId();
-    connection.launchPty(channelId, {
-      resume: resumeId ?? null,
-      agent: this.agentSelection() ?? null,
-      permissionMode: this.permissionMode() ?? undefined,
-      model: this.modelSelection() ?? null,
-      effortLevel: this.effortLevel() ?? null,
-      cwd: this.cwd() ?? undefined,
-      cols,
-      rows,
-    });
-
-    // When the extension discovers the session file on disk, update our signals.
-    // Unsubscribe after the first match since the ID won't change.
-    const unsub = connection.ptySessionIdEvents.add(({ channelId: cid, sessionId, summary }) => {
-      if (cid !== channelId) return;
-      this.sessionId(sessionId);
-      if (!this.summary()) this.summary(summary);
-      this.lastModifiedTime(Date.now());
-      unsub();
-    });
-
-    // Track turn start/completion for tab icon (orange = working, green = done).
-    connection.ptyTurnStartEvents.add(({ channelId: cid }) => {
-      if (cid === channelId && this.ptyTurnStart() <= this.ptyTurnDone()) {
-        this.ptyTurnStart(this.ptyTurnStart() + 1);
-      }
-    });
-    connection.ptyTurnDoneEvents.add(({ channelId: cid }) => {
-      if (cid === channelId) this.ptyTurnDone(this.ptyTurnDone() + 1);
-    });
-
-    return channelId;
-  }
-
-  sendPtyInput(data: string): void {
-    const channelId = this.ptyChannelId();
-    if (!channelId) return;
-    void this.getConnection().then(c => c.sendPtyInput(channelId, data));
-  }
-
-  sendPtyResize(cols: number, rows: number): void {
-    const channelId = this.ptyChannelId();
-    if (!channelId) return;
-    void this.getConnection().then(c => c.sendPtyResize(channelId, cols, rows));
   }
 
   async interruptAll(): Promise<void> {

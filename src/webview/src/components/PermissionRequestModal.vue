@@ -44,7 +44,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, provide, onMounted } from 'vue';
+import { ref, computed, provide, onMounted, nextTick } from 'vue';
 import type { PermissionRequest } from '../core/PermissionRequest';
 import type { ToolContext } from '../types/tool';
 import { useKeybinding } from '../utils/useKeybinding';
@@ -72,7 +72,7 @@ onMounted(() => {
   // a permission prompt arriving in one window would steal focus from an
   // input box the user is actively typing in elsewhere.
   if (document.hasFocus()) {
-    containerRef.value?.focus();
+    nextTick(() => containerRef.value?.focus());
   }
 });
 

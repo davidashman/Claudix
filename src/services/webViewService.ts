@@ -27,10 +27,6 @@ export interface WebviewBootstrapConfig {
 	title?: string;
 	/** Agent definition name to use for this panel's first session (from ~/.claude/agents/) */
 	initialAgent?: string;
-	/** When true, the panel renders an integrated xterm.js terminal instead of the chat message list */
-	terminalMode?: boolean;
-	/** When true (and terminalMode is true), hide the chat input box; permission/question modals still show */
-	terminalInputHidden?: boolean;
 }
 
 export interface IWebViewService extends vscode.WebviewViewProvider {
@@ -65,7 +61,7 @@ export interface IWebViewService extends vscode.WebviewViewProvider {
 	 * @param title
 	 * @param agentName Optional agent definition name (from ~/.claude/agents/)
 	 */
-	openChatPanel(sessionId: string | null, title: string, agentName?: string, options?: { terminalMode?: boolean; terminalInputHidden?: boolean }): void;
+	openChatPanel(sessionId: string | null, title: string, agentName?: string): void;
 
 	/**
 	 *  webviewId
@@ -93,7 +89,7 @@ export interface IWebViewService extends vscode.WebviewViewProvider {
 	 * Re-open chat panels that were open when the workspace was last closed.
 	 * Should be called once during extension activation.
 	 */
-	restoreOpenSessions(options?: { terminalMode?: boolean; terminalInputHidden?: boolean }): void;
+	restoreOpenSessions(): void;
 
 	/**
 	 * Must be called from extension deactivate() so panel state is saved before
@@ -294,7 +290,7 @@ export class WebViewService implements IWebViewService {
 
 	/**
 	 */
-	openChatPanel(sessionId: string | null, title: string, agentName?: string, options?: { terminalMode?: boolean; terminalInputHidden?: boolean }): void {
+	openChatPanel(sessionId: string | null, title: string, agentName?: string): void {
 		// If this session is already open in a panel, just reveal that panel.
 		if (sessionId) {
 			const existingModel = this.findModelBySessionId(sessionId);
@@ -316,7 +312,7 @@ export class WebViewService implements IWebViewService {
 
 		// Each panel gets a stable key that is independent of which session it currently shows.
 		const key = `panel-${crypto.randomUUID()}`;
-		const bootstrap: WebviewBootstrapConfig = { host: 'panel', page: 'chat', id: key, sessionId: sessionId || '', title, initialAgent: agentName || undefined, terminalMode: options?.terminalMode, terminalInputHidden: options?.terminalInputHidden };
+		const bootstrap: WebviewBootstrapConfig = { host: 'panel', page: 'chat', id: key, sessionId: sessionId || '', title, initialAgent: agentName || undefined };
 		const webviewId = this.getWebviewId(bootstrap);
 
 		this.logService.info(`[WebViewService] : sessionId=${sessionId}, title=${title}`);
@@ -443,13 +439,13 @@ export class WebViewService implements IWebViewService {
 		}
 	}
 
-	restoreOpenSessions(options?: { terminalMode?: boolean; terminalInputHidden?: boolean }): void {
+	restoreOpenSessions(): void {
 		const sessions = this.context.workspaceState.get<Array<{ sessionId: string; title: string }>>(
 			WebViewService.OPEN_SESSIONS_KEY, []
 		);
 		this.logService.info(`[WebViewService] Restoring ${sessions.length} session panel(s) from workspace state: [${sessions.map(s => s.sessionId).join(', ')}]`);
 		for (const { sessionId, title } of sessions) {
-			this.openChatPanel(sessionId, title, undefined, options?.terminalMode ? options : undefined);
+			this.openChatPanel(sessionId, title);
 		}
 	}
 

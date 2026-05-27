@@ -7,7 +7,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { InstantiationServiceBuilder } from './di/instantiationServiceBuilder';
-import { registerServices, ILogService, IClaudeAgentService, IWebViewService, IConfigurationService, ITerminalService } from './services/serviceRegistry';
+import { registerServices, ILogService, IClaudeAgentService, IWebViewService, IConfigurationService } from './services/serviceRegistry';
 import { VSCodeTransport } from './services/claude/transport/VSCodeTransport';
 
 let _webViewService: IWebViewService | undefined;
@@ -27,6 +27,11 @@ function listAllAgents(configDir?: string): AgentInfo[] {
 
 	// Walk ~/.claude/agents/ directly
 	walkAgentsDir(path.join(claudeDir, 'agents'), agents, seen);
+
+	// Walk .claude/agents/ in workspace folders
+	for (const folder of vscode.workspace.workspaceFolders ?? []) {
+		walkAgentsDir(path.join(folder.uri.fsPath, '.claude', 'agents'), agents, seen);
+	}
 
 	// Walk plugin cache: find plugin.json files, read their agents arrays
 	const cacheDir = path.join(claudeDir, 'plugins', 'cache');
@@ -125,21 +130,7 @@ export function activate(context: vscode.ExtensionContext) {
 		_webViewService = webViewService;
 		const claudeAgentService = accessor.get(IClaudeAgentService);
 		const configService = accessor.get(IConfigurationService);
-		const terminalService = accessor.get(ITerminalService);
 		const subscriptions = context.subscriptions;
-
-		function getDefaultMode(): string {
-			return vscode.workspace.getConfiguration('relay').get<string>('defaultMode', 'panel');
-		}
-
-		function isTerminalMode(): boolean {
-			const mode = getDefaultMode();
-			return mode === 'terminal' || mode === 'terminalWithInput';
-		}
-
-		function getTerminalOptions(): { terminalMode: boolean; terminalInputHidden: boolean } {
-			return { terminalMode: true, terminalInputHidden: getDefaultMode() === 'terminal' };
-		}
 
 		function getSessionCwd(): string {
 			return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? os.homedir();
@@ -183,11 +174,7 @@ export function activate(context: vscode.ExtensionContext) {
 				if (req.type === 'open_session_panel') {
 					const sessionId: string | null = req.sessionId || null;
 					const title: string = req.title || (sessionId ? 'Chat' : 'New Chat');
-					if (isTerminalMode() && sessionId) {
-						webViewService.openChatPanel(sessionId, title, undefined, getTerminalOptions());
-					} else {
-						webViewService.openChatPanel(sessionId, title);
-					}
+					webViewService.openChatPanel(sessionId, title);
 					// Send response back to the requesting webview
 					webViewService.postMessage({
 						type: 'response',
@@ -277,7 +264,7 @@ export function activate(context: vscode.ExtensionContext) {
 		claudeAgentService.start();
 
 		// Restore chat panels that were open when the workspace was last closed
-		webViewService.restoreOpenSessions(isTerminalMode() ? getTerminalOptions() : undefined);
+		webViewService.restoreOpenSessions();
 
 		// Listen for VSCode configuration changes and notify webview
 		const configChangeListener = vscode.workspace.onDidChangeConfiguration(e => {
@@ -354,11 +341,7 @@ export function activate(context: vscode.ExtensionContext) {
 			if (selected === undefined) return; // cancelled
 
 			const agentName = selected.label === 'Default (no agent)' ? undefined : selected.label;
-			if (isTerminalMode()) {
-				webViewService.openChatPanel(null, 'New Chat', agentName, getTerminalOptions());
-			} else {
-				webViewService.openChatPanel(null, 'New Chat', agentName);
-			}
+			webViewService.openChatPanel(null, 'New Chat', agentName);
 		}
 
 		// Register disposables
@@ -376,11 +359,7 @@ export function activate(context: vscode.ExtensionContext) {
 		context.subscriptions.push(
 			vscode.commands.registerCommand('relay.newSessionDefault', async () => {
 				const defaultAgentName = vscode.workspace.getConfiguration('relay').get<string>('defaultAgent', '');
-				if (isTerminalMode()) {
-					webViewService.openChatPanel(null, 'New Chat', defaultAgentName || undefined, getTerminalOptions());
-				} else {
-					webViewService.openChatPanel(null, 'New Chat', defaultAgentName || undefined);
-				}
+				webViewService.openChatPanel(null, 'New Chat', defaultAgentName || undefined);
 			})
 		);
 

@@ -33,6 +33,7 @@ const stateClass = computed(() => {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  margin-bottom: 1px;
 }
 
 .status-dot {

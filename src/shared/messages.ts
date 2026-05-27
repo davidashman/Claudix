@@ -726,90 +726,11 @@ export interface FocusChangedMessage extends BaseMessage {
     focused: boolean;
 }
 
-// ============================================================================
-// ============================================================================
-
-/**
- *  WebView → Extension
- */
-// ── PTY terminal messages ──────────────────────────────────────────────────
-
-/** Webview → Extension: spawn a PTY-backed Claude session */
-export interface LaunchPtyMessage extends BaseMessage {
-    type: "launch_pty";
-    channelId: string;
-    resume?: string | null;
-    cwd?: string;
-    agent?: string | null;
-    permissionMode?: string;
-    model?: string | null;
-    effortLevel?: string | null;
-    cols: number;
-    rows: number;
-}
-
-/** Webview → Extension: raw keystroke/paste data */
-export interface PtyInputMessage extends BaseMessage {
-    type: "pty_input";
-    channelId: string;
-    data: string;
-}
-
-/** Webview → Extension: terminal resized */
-export interface PtyResizeMessage extends BaseMessage {
-    type: "pty_resize";
-    channelId: string;
-    cols: number;
-    rows: number;
-}
-
-/** Extension → Webview: PTY output chunk */
-export interface PtyDataMessage extends BaseMessage {
-    type: "pty_data";
-    channelId: string;
-    data: string;
-}
-
-/** Extension → Webview: PTY process exited */
-export interface PtyExitMessage extends BaseMessage {
-    type: "pty_exit";
-    channelId: string;
-    exitCode: number;
-}
-
-/** Extension → Webview: discovered session ID and summary for a PTY channel from the JSONL file */
-export interface PtySessionIdMessage extends BaseMessage {
-    type: "pty_session_id";
-    channelId: string;
-    sessionId: string;
-    summary: string;
-}
-
-/** Extension → Webview: session files on disk have changed; recipients should refresh their session list */
-export interface SessionsChangedMessage extends BaseMessage {
-    type: "sessions_changed";
-}
-
-/** Extension → Webview: the PTY Claude turn has completed (fires via Stop hook) */
-export interface PtyTurnDoneMessage extends BaseMessage {
-    type: "pty_turn_done";
-    channelId: string;
-}
-
-/** Extension → Webview: the PTY Claude turn has started (fires when Enter is sent to the PTY) */
-export interface PtyTurnStartMessage extends BaseMessage {
-    type: "pty_turn_start";
-    channelId: string;
-}
-
 export type WebViewToExtensionMessage =
     | LaunchClaudeMessage
     | IOMessage
     | InterruptClaudeMessage
     | CloseChannelMessage
-    | LaunchPtyMessage
-    | PtyInputMessage
-    | PtyResizeMessage
     | RequestMessage
     | ResponseMessage
     | CancelRequestMessage
@@ -822,12 +743,6 @@ export type ExtensionToWebViewMessage =
     | IOMessage
     | CloseChannelMessage
     | LLMRequestErrorMessage
-    | PtyDataMessage
-    | PtyExitMessage
-    | PtySessionIdMessage
-    | PtyTurnDoneMessage
-    | PtyTurnStartMessage
-    | SessionsChangedMessage
     | RequestMessage
     | ResponseMessage;
 

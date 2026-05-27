@@ -51,7 +51,14 @@ export function useTabs(sessionStore: SessionStore): UseTabsReturn {
 
   async function replaceCurrentTab(): Promise<Session> {
     const currentIndex = activeTabIndex.value;
-    const session = await sessionStore.createSession({ isExplicit: true });
+    const current = sessionStore.activeSession();
+    const session = await sessionStore.createSession({
+      isExplicit: true,
+      initialModel: current?.modelSelection() ?? undefined,
+      initialEffort: current?.effortLevel() ?? undefined,
+      initialMode: current?.permissionMode() ?? undefined,
+      initialAgent: current?.agentSelection() ?? undefined,
+    });
 
     if (currentIndex >= 0) {
       const arr = [...openTabs.value];
