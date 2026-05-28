@@ -97,7 +97,7 @@ export const IClaudeAgentService = createDecorator<IClaudeAgentService>('claudeA
  */
 export interface Channel {
     in: AsyncStream<SDKUserMessage>;  //  SDK
-    query: Query;                      // Query  SDK
+    query: Query | undefined;         // Query  SDK (undefined while channel is starting)
 }
 
 /**
@@ -386,6 +386,13 @@ export class ClaudeAgentService implements IClaudeAgentService {
             const inputStream = new AsyncStream<SDKUserMessage>();
             this.logService.info('  ✓ ');
 
+            // Register the channel immediately so that io_messages arriving while
+            // spawnClaude is starting (awaiting env/path lookups) are buffered in
+            // inputStream rather than silently dropped.
+            const channelEntry: Channel = { in: inputStream, query: undefined };
+            this.channels.set(channelId, channelEntry);
+            this.logService.info(`  ✓ Channel registered early (${this.channels.size} total)`);
+
             // 2.  spawnClaude
             this.logService.info('');
             this.logService.info('📝  2:  spawnClaude()');
@@ -442,13 +449,18 @@ export class ClaudeAgentService implements IClaudeAgentService {
             );
             this.logService.info('  ✓ spawnClaude() Query ');
 
+            // If the channel was closed during startup (e.g. interrupt arrived before
+            // spawnClaude returned), clean up the spawned process and bail out.
+            if (!this.channels.has(channelId)) {
+                this.logService.warn(`[launchClaude] Channel ${channelId} was closed during startup, aborting`);
+                try { query.return?.(); } catch {}
+                return;
+            }
+
             // 3.  channels Map
             this.logService.info('');
             this.logService.info('📝  3:  Channel');
-            this.channels.set(channelId, {
-                in: inputStream,
-                query: query
-            });
+            channelEntry.query = query;
             this.logService.info(`  ✓ Channel  ${this.channels.size} `);
 
             // 4.  SDK
@@ -542,6 +554,16 @@ export class ClaudeAgentService implements IClaudeAgentService {
             return;
         }
 
+        if (!channel.query) {
+            // Channel is still starting up (spawnClaude hasn't returned yet).
+            // Close the input stream so the process terminates once it starts,
+            // and remove from the map so launchClaude bails out on return.
+            channel.in.done();
+            this.channels.delete(channelId);
+            this.logService.info(`[ClaudeAgentService] Channel ${channelId} interrupted during startup`);
+            return;
+        }
+
         try {
             await this.sdkService.interrupt(channel.query);
             this.logService.info(`[ClaudeAgentService]  Channel: ${channelId}`);
@@ -569,7 +591,7 @@ export class ClaudeAgentService implements IClaudeAgentService {
         if (channel) {
             channel.in.done();
             try {
-                channel.query.return?.();
+                channel.query?.return?.();
             } catch (e) {
                 this.logService.warn(`Error cleaning up channel: ${e}`);
             }
@@ -985,8 +1007,8 @@ export class ClaudeAgentService implements IClaudeAgentService {
      */
     async setPermissionMode(channelId: string, mode: PermissionMode): Promise<void> {
         const channel = this.channels.get(channelId);
-        if (!channel) {
-            this.logService.warn(`[setPermissionMode] Channel ${channelId} not found`);
+        if (!channel?.query) {
+            this.logService.warn(`[setPermissionMode] Channel ${channelId} not found or still starting`);
             throw new Error(`Channel ${channelId} not found`);
         }
 
@@ -998,8 +1020,8 @@ export class ClaudeAgentService implements IClaudeAgentService {
      */
     async setModel(channelId: string, model: string): Promise<void> {
         const channel = this.channels.get(channelId);
-        if (!channel) {
-            this.logService.warn(`[setModel] Channel ${channelId} not found`);
+        if (!channel?.query) {
+            this.logService.warn(`[setModel] Channel ${channelId} not found or still starting`);
             throw new Error(`Channel ${channelId} not found`);
         }
 
