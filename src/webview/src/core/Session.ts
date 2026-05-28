@@ -459,8 +459,8 @@ export class Session {
     const userMessage = this.buildUserMessage(input, attachments, selectionPayload);
     const messageModel = MessageModel.fromRaw(userMessage);
 
-    // Slash commands (e.g. /compact) are internal SDK directives — don't
-    // render them as visible user messages in the thread.
+    // Only /clear and /compact are handled locally — don't render them as
+    // visible user messages. All other slash commands appear in the thread.
     if (messageModel && !isSlash) {
       this.messages([...this.messages(), messageModel]);
       // Track for silent replay if auto-compaction absorbs this turn.
@@ -1360,7 +1360,8 @@ This may or may not be related to the current task.</ide_selection>`
   }
 
   private isSlashCommand(input: string): boolean {
-    return input.trim().startsWith('/');
+    const cmd = input.trim().split(/\s/)[0];
+    return cmd === '/clear' || cmd === '/compact';
   }
 
   private isSameSelection(a?: SelectionRange, b?: SelectionRange): boolean {

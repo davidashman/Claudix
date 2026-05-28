@@ -862,8 +862,8 @@ function walkCommandsDir(dir: string, prefix: string, results: CustomCommand[], 
     }
 }
 
-function listCustomCommands(workspaceFolderPath?: string): CustomCommand[] {
-    const claudeDir = path.join(os.homedir(), '.claude');
+function listCustomCommands(workspaceFolderPath?: string, configDir?: string): CustomCommand[] {
+    const claudeDir = configDir ?? path.join(os.homedir(), '.claude');
     const commands: CustomCommand[] = [];
     const seen = new Set<string>();
 
@@ -881,7 +881,7 @@ function listCustomCommands(workspaceFolderPath?: string): CustomCommand[] {
 /**
  */
 async function loadConfig(context: HandlerContext): Promise<any> {
-    const { logService, sdkService, workspaceService } = context;
+    const { logService, sdkService, workspaceService, configService } = context;
 
     logService.info("Loading config cache by launching Claude...");
 
@@ -909,7 +909,10 @@ async function loadConfig(context: HandlerContext): Promise<any> {
         (query as any).accountInfo?.() ?? null,
     ]);
 
-    const customCommands = listCustomCommands(workspaceFolder?.uri.fsPath);
+    const configDir = await configService.getConfigurationDirectory()
+        ?? process.env.CLAUDE_CONFIG_DIR
+        ?? path.join(os.homedir(), '.claude');
+    const customCommands = listCustomCommands(workspaceFolder?.uri.fsPath, configDir);
     const sdkCommandNames = new Set((sdkCommands as any[]).map((c: any) => c?.name).filter(Boolean));
     const merged = [...sdkCommands, ...customCommands.filter(c => !sdkCommandNames.has(c.name))];
 
