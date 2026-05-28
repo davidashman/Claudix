@@ -30,7 +30,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 import ToolMessageWrapper from './common/ToolMessageWrapper.vue';
 import type { ToolContext } from '@/types/tool';
 import ToolError from './common/ToolError.vue';
@@ -71,13 +71,19 @@ const isPermissionRequest = computed(() => {
   return !hasToolUseResult && !hasToolResult;
 });
 
+// Track if this was a live permission request (vs. loaded from session history)
+const wasLivePermissionRequest = ref(false);
+watch(() => isPermissionRequest.value, (isPending) => {
+  if (isPending) wasLivePermissionRequest.value = true;
+}, { immediate: true });
+
 // ,
 const shouldExpand = computed(() => {
-  if (isPermissionRequest.value) return true;
-
-  if (props.toolResult?.is_error) return true;
-
-  return false;
+  if (!newSource.value) return false;
+  // Live permission request: only expand while pending, collapse after approval
+  if (wasLivePermissionRequest.value) return isPermissionRequest.value;
+  // Session reload (already resolved): expand to show what was changed
+  return true;
 });
 </script>
 

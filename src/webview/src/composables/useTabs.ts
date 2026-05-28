@@ -83,9 +83,12 @@ export function useTabs(sessionStore: SessionStore): UseTabsReturn {
   }
 
   function closeTab(index: number): void {
+    const closedSession = openTabs.value[index];
+
     if (openTabs.value.length <= 1) {
       // Last tab — replace with a new empty session rather than leaving zero tabs
       void replaceCurrentTab();
+      if (closedSession) void closedSession.interruptAll();
       return;
     }
 
@@ -99,6 +102,8 @@ export function useTabs(sessionStore: SessionStore): UseTabsReturn {
       const newIndex = Math.min(index, arr.length - 1);
       sessionStore.setActiveSession(arr[newIndex] as unknown as Session);
     }
+
+    if (closedSession) void closedSession.interruptAll();
   }
 
   function switchToTab(index: number): void {

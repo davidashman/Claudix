@@ -138,9 +138,19 @@ const isPermissionRequest = computed(() => {
   return !props.toolUseResult && props.toolUse?.input?.old_string && props.toolUse?.input?.new_string;
 });
 
+// Track if this was a live permission request (vs. loaded from session history)
+const wasLivePermissionRequest = ref(false);
+watch(() => isPermissionRequest.value, (isPending) => {
+  if (isPending) wasLivePermissionRequest.value = true;
+}, { immediate: true });
+
 // ,
 const shouldExpand = computed(() => {
-  return hasDiffView.value && isPermissionRequest.value;
+  if (!hasDiffView.value) return false;
+  // Live permission request: only expand while pending, collapse after approval
+  if (wasLivePermissionRequest.value) return isPermissionRequest.value;
+  // Session reload (already resolved): expand to show what was changed
+  return true;
 });
 
 // DOM

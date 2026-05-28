@@ -664,6 +664,11 @@ export class Session {
     // creates a fresh channel rather than reusing this one. The process may
     // take time to exit (or never exit), so we can't wait for close_channel.
     this.claudeChannelId(undefined);
+    // Clear any pending fork session ID before the first await so that
+    // drainOutboundQueue() (which may fire from readMessages finally before
+    // getConnection resolves) uses the stable sessionId(), not an incomplete
+    // fork whose JSONL content has not yet been written by the CLI.
+    this._sdkSessionId = undefined;
     const connection = await this.getConnection();
     // Terminate the local stream right away so readMessages unblocks even if
     // the backend process is slow or stuck after receiving SIGINT.
